@@ -33,4 +33,14 @@ class Ofisi extends Model
         return $this->hasMany(Message::class);
     }
 
+    protected $fillable = [
+        'jina',
+        'mkoa',
+        'wilaya',
+        'kata',
+        'kujiunga_wapya',
+        'maelezo',
+        'last_seen',
+    ];
+
 }

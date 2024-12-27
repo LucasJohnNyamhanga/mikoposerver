@@ -8,13 +8,13 @@ class Message extends Model
 {
 
     protected $fillable = [
-        'kikundi_id',
+        'ofisi_id',
         'sender_id',
         'receiver_id',
         'message',
         'status',
     ];
-    
+
     public function ofisi()
     {
         return $this->belongsTo(Ofisi::class);
