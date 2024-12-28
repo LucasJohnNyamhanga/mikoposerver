@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('wilaya');
             $table->string('kata');
             $table->boolean('kujiunga_wapya')->default(true);
-            $table->longText('maelezo');
+            $table->longText('maelezo')->nullable();
             $table->dateTime('last_seen')->nullable();
             $table->timestamps();
         });

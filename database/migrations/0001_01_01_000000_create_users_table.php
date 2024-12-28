@@ -9,6 +9,8 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
+    
+
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
@@ -17,6 +19,7 @@ return new class extends Migration
             $table->string('jina_kamili');
             $table->string('jina_mdhamini');
             $table->string('simu_mdhamini');
+            $table->string('anakoishi');
             $table->string('picha')->nullable();
             $table->boolean('is_manager')->default(false);
             $table->boolean('is_admin')->default(false);
