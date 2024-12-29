@@ -14,3 +14,4 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);
 Route::get('getOfisiByLocation', [OfisiController::class, 'getOfisiByLocation']);
+Route::post('validateNewRegisterRequest', [OfisiController::class, 'validateNewRegisterRequest']);

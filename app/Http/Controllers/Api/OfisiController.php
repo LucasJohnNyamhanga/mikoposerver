@@ -7,6 +7,7 @@ use App\Http\Requests\OfisiRequest;
 use App\Models\Ofisi;
 use App\Models\User;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class OfisiController extends Controller
 {
@@ -86,5 +87,58 @@ class OfisiController extends Controller
                 'sms' => 'Hitilafu ya server: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function validateNewRegisterRequest(OfisiRequest $request)
+    {
+        // Validate the incoming request
+        $validator = Validator::make($request->all(), [
+            'jinaKamili' => 'required|string|max:255',
+            'simu' => 'required|string|max:15|unique:users,mobile',
+            'makazi' => 'required|string|max:255',
+            'jinaMtumiaji' => 'required|string|max:255|unique:users,username',
+            'jinaOfisi' => 'required|string|max:255',
+            'mkoa' => 'required|string|max:255',
+            'wilaya' => 'required|string|max:255',
+            'kata' => 'required|string|max:255',
+        ]);
+
+        // Return validation errors if they exist
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first()
+            ], 400);
+        }
+
+        // Check for unique 'simu'
+        if (DB::table('users')->where('mobile', $request->simu)->exists()) {
+            return response()->json([
+                'message' => 'Namba ya simu imeshatumika'
+            ], 400);
+        }
+
+        // Check for unique 'jinaMtumiaji'
+        if (DB::table('users')->where('username', $request->jinaMtumiaji)->exists()) {
+            return response()->json([
+                'message' => 'Jina la mtumiaji limeshatumika'
+            ], 400);
+        }
+
+        // Check for unique combination of 'jinaOfisi', 'mkoa', 'wilaya', 'kata'
+        if (DB::table('ofisis')
+            ->where('jina', $request->jinaOfisi)
+            ->where('mkoa', $request->mkoa)
+            ->where('wilaya', $request->wilaya)
+            ->where('kata', $request->kata)
+            ->exists()) {
+            return response()->json([
+                'message' => 'Jina la ofisi limeshatumika katika eneo hili'
+            ], 400);
+        }
+
+        // If all validations pass
+        return response()->json([
+            'message' => 'Mteja anafaa kusajiliwa, anza ku-upload image'
+        ], 200);
     }
 }
