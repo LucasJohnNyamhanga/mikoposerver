@@ -15,3 +15,6 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::post('/upload', [UploadController::class, 'uploadImage']);
 Route::get('getOfisiByLocation', [OfisiController::class, 'getOfisiByLocation']);
 Route::post('validateNewRegisterRequest', [OfisiController::class, 'validateNewRegisterRequest']);
+Route::post('validateOldRegisterRequest', [OfisiController::class, 'validateOldRegisterRequest']);
+Route::post('registerMtumishiNewOfisi', [OfisiController::class, 'registerMtumishiNewOfisi']);
+Route::post('registerMtumishiOldOfisi', [OfisiController::class, 'registerMtumishiOldOfisi']);

@@ -33,7 +33,7 @@ class UploadController extends Controller
             }
 
             // Set the upload path
-            $imagePath = public_path('uploads/kikundi/images/');
+            $imagePath = public_path('uploads/mikopo/images/');
             
             // Generate unique file name
             $new_name = Str::random(10) . '_' . time() . '.' . $image->getClientOriginalExtension();
@@ -43,7 +43,7 @@ class UploadController extends Controller
 
             // Return success response
             return response()->json([
-                'message' => 'http://10.0.2.2:8000/uploads/kikundi/images/' . $new_name,
+                'message' => 'http://10.0.2.2:8000/uploads/mikopo/images/' . $new_name,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
