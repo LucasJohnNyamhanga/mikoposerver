@@ -3,10 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserOfisi extends Model
 {
-    public function position()
+    public function position():BelongsTo
     {
         return $this->belongsTo(Position::class);
     }
@@ -14,7 +15,7 @@ class UserOfisi extends Model
     /**
      * Get the user for this KikundiUser.
      */
-    public function user()
+    public function user():BelongsTo
     {
         return $this->belongsTo(User::class);
     }
@@ -22,7 +23,7 @@ class UserOfisi extends Model
     /**
      * Get the Kikundi for this KikundiUser.
      */
-    public function ofisi()
+    public function ofisi():BelongsTo
     {
         return $this->belongsTo(Ofisi::class);
     }

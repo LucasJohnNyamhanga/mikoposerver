@@ -10,6 +10,7 @@ use App\Models\Position;
 use App\Models\User;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class OfisiController extends Controller
 {
@@ -311,6 +312,66 @@ class OfisiController extends Controller
                 'message' => 'Hitilafu : ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function login(OfisiRequest $request)
+    {
+        // Validate input fields
+        $validator = Validator::make($request->all(), [
+            'username' => 'required|string',
+            'password' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Jaza nafasi zote zilizo wazi.', 'errors' => $validator->errors()], 400);
+        }
+        
+        $username = $request->input('username');
+        $password = $request->input('password');
+
+        // Find the user by username
+        $user = User::where("username", $username)->first();
+
+        if (!$user) {
+            // Return error if user is not found
+            return response()->json(['message' => 'Jina au password uliotumia, siyo sahihi.'], 401);
+        }
+
+        $passwordDatabase = $user->password;
+        if ($password == $passwordDatabase) {
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            // Return user and token if successful
+            return response()->json([
+                'user' => $user,
+                'token' => $token,
+            ], 200);
+    
+        } else {
+            return response()->json(['message' => 'Jina au password uliotumia, siyo sahihi.'], 401);
+        }
+    }
+
+    public function logWithAccessToken(OfisiRequest $request)
+    {
+        // Retrieve the user with their active Kikundi details
+        $user = User::where('id', Auth::id())->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'Uhakiki wa utumishi wako umeshindikana, wasiliana na 0784477999.'], 404);
+        }
+        return response()->json([
+            'user' => $user,
+        ], 200);
+    }
+
+
+    public function logout(OfisiRequest $request)
+    {
+        $user = $request->user();
+        $user->currentAccessToken()->delete();
+
+        return response()->json(['message'=> 'logout'],200);
     }
 
     private function sendNotificationUongozi($messageContent, $ofisiId)
