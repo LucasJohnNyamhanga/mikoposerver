@@ -135,45 +135,43 @@ class OfisiController extends Controller
         // Validate the incoming request
         $validator = Validator::make($request->all(), [
             'jinaKamili' => 'required|string|max:255',
-            'simu' => 'required|string|max:15',
+            'simu' => 'required|string|max:15|unique:users,mobile', // Ensures unique phone number
             'makazi' => 'required|string|max:255',
-            'jinaMtumiaji' => 'required|string|max:255',
+            'jinaMtumiaji' => 'required|string|max:255|unique:users,username', // Ensures unique username
             'jinaOfisi' => 'required|string|max:255',
             'mkoa' => 'required|string|max:255',
             'wilaya' => 'required|string|max:255',
             'kata' => 'required|string|max:255',
+        ], [
+            'simu.unique' => 'Namba ya simu imeshatumika kwa mtumishi mwingine', // Custom message for phone uniqueness
+            'jinaMtumiaji.unique' => 'Jina la mtumiaji limeshatumika kwa mtumishi mwingine', // Custom message for username uniqueness
         ]);
 
         // Return validation errors if they exist
         if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Jaza maeneo yote yaliyowazi kuendelea'
-            ], 400);
-        }
+            // Check if there are any validation error messages
+            $errorMessages = $validator->errors();
 
-        // Check for unique 'simu'
-        if (DB::table('users')->where('mobile', $request->simu)->exists()) {
-            return response()->json([
-                'message' => 'Namba ya simu imeshatumika'
-            ], 400);
-        }
+            // If there are no specific messages, use the default message
+            $message = $errorMessages->isEmpty() ? 'Jaza maeneo yote yaliyowazi kuendelea' : $errorMessages;
 
-        // Check for unique 'jinaMtumiaji'
-        if (DB::table('users')->where('username', $request->jinaMtumiaji)->exists()) {
             return response()->json([
-                'message' => 'Jina la mtumiaji limeshatumika'
+                'message' => $message,
+                'errors' => $errorMessages, // Return the validation errors for clarity
             ], 400);
         }
 
         // Check for unique combination of 'jinaOfisi', 'mkoa', 'wilaya', 'kata'
-        if (DB::table('ofisis')
+        $ofisiExists = DB::table('ofisis')
             ->where('jina', $request->jinaOfisi)
             ->where('mkoa', $request->mkoa)
             ->where('wilaya', $request->wilaya)
             ->where('kata', $request->kata)
-            ->exists()) {
+            ->exists();
+
+        if ($ofisiExists) {
             return response()->json([
-                'message' => 'Jina la ofisi limeshatumika katika eneo hili'
+                'message' => "Jina la ofisi ya {$request->jinaOfisi} limeshatumika katika mkoa wa {$request->mkoa}, wilaya ya {$request->wilaya}, kata ya {$request->kata}"
             ], 400);
         }
 
@@ -183,44 +181,40 @@ class OfisiController extends Controller
         ], 200);
     }
 
+
     public function validateOldRegisterRequest(OfisiRequest $request)
     {
-        // Validate the incoming request
+        // Validate the incoming request with custom error messages
         $validator = Validator::make($request->all(), [
             'jinaKamili' => 'required|string|max:255',
-            'simu' => 'required|string|max:15',
+            'simu' => 'required|string|max:15|unique:users,mobile', // Ensures the phone number is unique
             'makazi' => 'required|string|max:255',
-            'jinaMtumiaji' => 'required|string|max:255',
-            'ofisiId' => 'required|integer',
+            'jinaMtumiaji' => 'required|string|max:255|unique:users,username', // Ensures the username is unique
+            'ofisiId' => 'required|integer', 
+        ], [
+            'simu.unique' => 'Namba ya simu imeshatumika tayari. Tafadhali tumia namba nyingine.', // Custom message for the 'unique' validation on 'simu'
+            'jinaMtumiaji.unique' => 'Jina la mtumiaji limeshatumika tayari. Tafadhali tumia jina lingine.', // Custom message for the 'unique' validation on 'jinaMtumiaji'
         ]);
 
         // Return validation errors if they exist
         if ($validator->fails()) {
+            // Check if there are any validation error messages
+            $errorMessages = $validator->errors();
+
+            // If there are no specific messages, use the default message
+            $message = $errorMessages->isEmpty() ? 'Jaza maeneo yote yaliyowazi kuendelea' : $errorMessages;
+
             return response()->json([
-                'message' => 'Jaza maeneo yote yaliyowazi kuendelea'
+                'message' => $message,
+                'errors' => $errorMessages, // Return the validation errors for clarity
             ], 400);
         }
 
-        // Check for unique 'simu'
-        if (DB::table('users')->where('mobile', $request->simu)->exists()) {
-            return response()->json([
-                'message' => 'Namba ya simu imeshatumika'
-            ], 400);
-        }
-
-        // Check for unique 'jinaMtumiaji'
-        if (DB::table('users')->where('username', $request->jinaMtumiaji)->exists()) {
-            return response()->json([
-                'message' => 'Jina la mtumiaji limeshatumika'
-            ], 400);
-        }
-
-        // Check if ofisi exists
+        // Check if ofisi exists using Eloquent, this is just for consistency as you have already used it
         $ofisi = Ofisi::find($request->ofisiId);
-
         if (!$ofisi) {
             return response()->json([
-                'message' => 'Ofisi uliyoichagua haipo au imefutwa'
+                'message' => "Ofisi uliyoichagua haipo au imefutwa"
             ], 400);
         }
 
@@ -229,6 +223,7 @@ class OfisiController extends Controller
             'message' => 'Mteja anafaa kusajiliwa, anza ku-upload image'
         ], 200);
     }
+
 
     public function registerMtumishiOldOfisi(OfisiRequest $request)
     {
