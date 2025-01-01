@@ -23,7 +23,7 @@ return new class extends Migration
             $table->timestamps();
             $table->foreignId('ofisi_id');
             $table->foreign('ofisi_id')->references('id')->on('ofisis')->onDelete('cascade');
-            $table->foreignId('user_id');
+            $table->foreignId('user_id')->nullable(); //in case afisa amefutwa
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }

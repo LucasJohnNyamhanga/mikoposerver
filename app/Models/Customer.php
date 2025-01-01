@@ -31,7 +31,7 @@ class Customer extends Model
         'simu',
         'kazi',
         'picha',
-        'office_id',
+        'ofisi_id',
         'user_id',
     ];
 
