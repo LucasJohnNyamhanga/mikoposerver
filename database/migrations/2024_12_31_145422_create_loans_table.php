@@ -16,9 +16,9 @@ return new class extends Migration
             $table->decimal('amount', 15, 2);
             $table->decimal('interest_rate', 5, 2)->default(10);
             $table->decimal('total_due', 15, 2)->nullable();
-            $table->enum('status', ['pending', 'approved', 'repaid', 'defaulted','paused'])->default('pending');
-            $table->enum('kipindi_malipo', ['siku', 'wiki', 'mwezi', 'mwaka'])->default('mwezi');
-            $table->enum('loan_type', ['group', 'personal'])->default('personal');
+            $table->enum('status', ['pending','waiting','error','approved','repaid','defaulted','closed'])->default('pending');
+            $table->enum('kipindi_malipo', ['siku', 'wiki', 'mwezi', 'mwaka']);
+            $table->enum('loan_type', ['kikundi', 'binafsi']);
             $table->integer('muda_malipo')->nullable();
             $table->dateTime('issued_date')->nullable();
             $table->dateTime('due_date')->nullable();

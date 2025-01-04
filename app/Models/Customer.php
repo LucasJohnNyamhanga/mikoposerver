@@ -23,6 +23,23 @@ class Customer extends Model
         return $this->belongsToMany(Loan::class, 'loan_customers');
     }
 
+    public function dhamana()
+    {
+        return $this->hasMany(Dhamana::class);
+    }
+
+    public function mikopoAliyodhamini()
+    {
+        return $this->belongsToMany(Loan::class, 'mdhaminis')
+                    ->withTimestamps();
+    }
+
+    public function wadhamini()
+    {
+        return $this->belongsToMany(Customer::class, 'mdhaminis', 'loan_id', 'customer_id')
+                    ->withTimestamps();
+    }
+
     protected $fillable = [
         'jina',
         'jinaMaarufu',

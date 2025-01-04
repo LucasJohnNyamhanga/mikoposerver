@@ -36,7 +36,7 @@ class Ofisi extends Model
         return $this->hasMany(Message::class);
     }
 
-    public function customer():HasMany
+    public function customers():HasMany
     {
         return $this->hasMany(Customer::class);
     }
@@ -49,6 +49,24 @@ class Ofisi extends Model
     public function transactions()
     {
         return $this->hasMany(Transaction::class);
+    }
+
+    public function transactionsMwezi()
+    {
+        return $this->hasMany(Transaction::class)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->latest();
+    }
+
+    public function ainamikopo():HasMany
+    {
+        return $this->hasMany(Aina::class);
+    }
+
+    public function dhamana()
+    {
+        return $this->hasMany(Dhamana::class);
     }
 
     protected $fillable = [

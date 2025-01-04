@@ -49,6 +49,11 @@ class Loan extends Model
         return null;
     }
 
+    public function mabadiliko()
+    {
+        return $this->hasMany(Mabadiliko::class);
+    }
+
     // $personalLoans = Loan::whereHas('customers', function ($query) {
     //     $query->havingRaw('count(*) = 1'); // Personal loan has only 1 customer
     // })
@@ -60,5 +65,16 @@ class Loan extends Model
     // })
     // ->with('customers') // Eager load the customers relationship
     // ->get();
+
+    public function wadhamini()
+    {
+        return $this->belongsToMany(Customer::class, 'mdhaminis', 'loan_id', 'customer_id')
+                    ->withTimestamps();
+    }
+
+    public function dhamana()
+    {
+        return $this->hasMany(Dhamana::class);
+    }
 
 }

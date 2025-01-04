@@ -58,22 +58,25 @@ class OfisiController extends Controller
                     $query->with(['receivedMessages' => function ($query) {
                                 $query->with(['sender', 'receiver'])
                                 ->where('receiver_id', Auth::id())
-                                    ->latest()->take(10);
+                                    ->latest();
                             }
                         ])->latest();
-                    }, 'loans' => function ($query) {
-                            $query->with(['user' ,'transactions'=> function ($query) {
+                    },'customers'=> function ($query) {
+                                $query->latest();
+                            }
+                            ,'loans' => function ($query) {
+                            $query->with(['customers','user','transactions'=> function ($query) {
                                 $query->with([
                                     'user','approver','creator'
-                                ]);
+                                ])->latest();
                             }
-                            // ,'wadhamini','mabadiliko'=> function ($query) {
-                            //     $query->latest();
-                            // }
+                            ,'wadhamini','dhamana','mabadiliko'=> function ($query) {
+                                $query->latest();
+                            }
                             ])->latest();
-                        },])->where('id', $ofisi->id)
-            ->first();
-        
+                        },'transactions'=> function ($query) {
+                                $query->latest();
+                            },'ainamikopo'])->where('id', $ofisi->id)->first();
 
             return response()->json([
             'user_id' => $user->id,
@@ -82,7 +85,7 @@ class OfisiController extends Controller
 
         }
 
-        return response()->json(['message' => 'Huna usajili kwenye kikundi chochote. Piga simu msaada 0784477999'], 401);
+        return response()->json(['message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'], 401);
         
     }
 
