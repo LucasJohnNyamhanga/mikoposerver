@@ -14,10 +14,8 @@ return new class extends Migration
         Schema::create('ainas', function (Blueprint $table) {
             $table->id();
             $table->string('jina');
-            $table->integer('riba');
-            $table->integer('fomu');
-            $table->enum('kipindi_malipo', ['siku', 'wiki', 'mwezi']);
-            $table->integer('muda_malipo');
+            $table->decimal('riba', 5, 2);
+            $table->decimal('fomu', 5, 2);
             $table->enum('loan_type', ['kikundi', 'binafsi']);
             $table->foreignId('ofisi_id');
             $table->foreign('ofisi_id')->references('id')->on('ofisis')->onDelete('cascade');

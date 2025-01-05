@@ -14,7 +14,8 @@ return new class extends Migration
         Schema::create('loans', function (Blueprint $table) {
             $table->id();
             $table->decimal('amount', 15, 2);
-            $table->decimal('interest_rate', 5, 2)->default(10);
+            $table->decimal('riba', 5, 2)->default(10);
+            $table->decimal('fomu', 5, 2)->default(10);
             $table->decimal('total_due', 15, 2)->nullable();
             $table->enum('status', ['pending','waiting','error','approved','repaid','defaulted','closed'])->default('pending');
             $table->enum('kipindi_malipo', ['siku', 'wiki', 'mwezi', 'mwaka']);
@@ -22,6 +23,7 @@ return new class extends Migration
             $table->integer('muda_malipo')->nullable();
             $table->dateTime('issued_date')->nullable();
             $table->dateTime('due_date')->nullable();
+            $table->longText('status_details')->nullable();
             $table->foreignId('ofisi_id');
             $table->foreignId('user_id');
             $table->timestamps();

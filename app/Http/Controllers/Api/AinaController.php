@@ -10,17 +10,15 @@ use Illuminate\Support\Facades\Validator;
 
 class AinaController extends Controller
 {
-    public function storeAinaMkopo(AinaRequest $request)
+    public function sajiliMakato(AinaRequest $request)
     {
 
         $validator = Validator::make($request->all(), [
             'jina' => 'required|string|max:255',
             'ofisiId' => 'required|integer',
             'riba' => 'required|integer',
-            'kipindiMalipo' => 'required|integer',
             'fomu' => 'required|integer',
-            'mudaMalipo' => 'required|integer',
-            'loanType' => 'required|integer',
+            'loanType' => 'required|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -46,8 +44,6 @@ class AinaController extends Controller
             'jina' => $jina,
             'riba' => $riba,
             'fomu' => $fomu,
-            'kipindi_malipo' => $kipindiMalipo,
-            'muda_malipo' => $mudaMalipo,
             'loan_type' => $loanType,
             'ofisi_id' => $office->id,
         ]);

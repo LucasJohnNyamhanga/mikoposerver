@@ -77,4 +77,20 @@ class Loan extends Model
         return $this->hasMany(Dhamana::class);
     }
 
+    protected $fillable = [
+        'amount',
+        'riba',
+        'fomu',
+        'total_due',
+        'status',
+        'kipindi_malipo',
+        'loan_type',
+        'muda_malipo',
+        'issued_date',
+        'due_date',
+        'ofisi_id',
+        'user_id',
+        'status_details',
+    ];
+
 }

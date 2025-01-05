@@ -18,7 +18,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('getOfisiData', [OfisiController::class, 'getOfisiData']);
     Route::post('sajiliMteja', [CustomerController::class, 'sajiliMteja']);
     Route::post('ondoaUnreadMeseji', [MessageController::class, 'ondoaUnreadMeseji']);
-    Route::post('storeAinaMkopo', [AinaController::class, 'storeAinaMkopo']);
+    Route::post('sajiliMakato', [AinaController::class, 'sajiliMakato']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

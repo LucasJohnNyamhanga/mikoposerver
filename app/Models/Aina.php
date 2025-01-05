@@ -16,8 +16,6 @@ class Aina extends Model
         'jina',
         'riba',
         'fomu',
-        'kipindi_malipo',
-        'muda_malipo',
         'loan_type',
         'ofisi_id',
     ];
