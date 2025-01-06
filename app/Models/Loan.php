@@ -25,7 +25,7 @@ class Loan extends Model
     // A loan can have multiple customers (group loans)
     public function customers()
     {
-        return $this->belongsToMany(Customer::class, 'loan_customers');
+        return $this->belongsToMany(Customer::class, 'loan_customers','loan_id', 'customer_id')->withTimestamps();
     }
 
     // Check if the loan is personal

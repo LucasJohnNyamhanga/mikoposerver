@@ -17,4 +17,9 @@ class LoanCustomer extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    protected $fillable = [
+        'loan_id',
+        'customer_id',
+    ];
 }

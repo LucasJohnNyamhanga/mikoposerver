@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoanRequest;
+use App\Models\Customer;
 use App\Models\Loan;
+use App\Models\LoanCustomer;
 use App\Models\Mabadiliko;
 use App\Models\Mdhamini;
 use App\Models\Message;
@@ -19,106 +21,122 @@ class LoanController extends Controller
     {
         // Validate input
         $validator = Validator::make($request->all(), [
-            'kiasi' => 'required|numeric|min:0',
-            // 'interest_rate' => 'required|numeric|min:0|max:100',
-            // 'kipindi_malipo' => 'required|in:siku,wiki,mwezi,mwaka',
-            // 'due_date' => 'required|date|after:today',
-            'wadhaminiIds' => 'required|array|min:1',
-            'wadhaminiIds.*' => 'exists:users,id', // Ensure each guarantor exists
-            'mwombaMkopo' => 'required|exists:users,id',
-            'kikundiId' => 'required|exists:kikundis,id',
+            'amount' => 'required|numeric|min:0',
+            'riba' => 'required|numeric|min:0|max:100',
+            'fomu' => 'required|numeric|min:0|max:100',
+            'totalDue' => 'required|numeric|min:0',
+            'kipindiMalipo' => 'required|in:siku,wiki,mwezi,mwaka',
+            'mudaMalipo' => 'nullable|integer|min:1',
+            'userId' => 'required|exists:users,id',
+            'ofisiId' => 'required|exists:ofisis,id',
+            'loanType' => 'required|in:kikundi,binafsi',
+            'wateja' => 'nullable|array',
+            'wateja.*' => 'exists:customers,id',
+            'wadhamini' => 'nullable|array',
+            'wadhamini.*' => 'exists:customers,id',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $kikundi = Ofisi::find($request->kikundiId);
-
-        $mkuu = $kikundi->users()
-                    ->wherePivot('position_id', 1)
-                    ->first();
-
-        $loanExisting = Loan::where('user_id', $request->mwombaMkopo)
-        ->where(function ($query) {
-            $query->where('status', 'pending')
-                ->orWhere('status', 'approved')
-                ->orWhere('status', 'defaulted')
-                ->orWhere('status', 'error');
-        })
-        ->exists();
-
-        if ($loanExisting) {
-            return response()->json(['message' => 'Mwanakikundi tayari ameshaomba mkopo au ana mkopo unaoendelea.'], 401);
-        }
-
         DB::beginTransaction();
         try {
-            // Save loan
+            $ofisi = Ofisi::find($request->ofisiId);
+            $user = Auth::user();
+
+            // Check if any of the customers already have active loans
+            $loanExisting = Loan::whereIn('user_id', $request->wateja)
+                ->whereIn('status', ['pending', 'approved', 'defaulted', 'error'])
+                ->exists();
+
+            if ($loanExisting) {
+                return response()->json([
+                    'message' => 'Mmoja au zaidi ya wateja tayari wana mkopo unaoendelea au ombi lililopo.'
+                ], 401);
+            }
+
+            // Create a loan
             $loan = Loan::create([
-                'user_id' => $request->mwombaMkopo,
-                'kikundi_id' => $request->kikundiId,
-                'amount' => $request->kiasi,
+                'amount' => $request->amount,
+                'riba' => $request->riba,
+                'fomu' => $request->fomu,
+                'total_due' => $request->totalDue,
+                'kipindi_malipo' => $request->kipindiMalipo,
+                'muda_malipo' => $request->mudaMalipo,
+                'loan_type' => $request->loanType,
+                'user_id' => $request->userId,
+                'ofisi_id' => $request->ofisiId,
                 'status' => 'pending',
             ]);
 
-            // Save guarantors
-            foreach ($request->wadhaminiIds as $guarantorId) {
-                Mdhamini::create([
+            // Attach wateja
+            foreach ($request->wateja as $mkopajiId) {
+                LoanCustomer::create([
                     'loan_id' => $loan->id,
-                    'user_id' => $guarantorId,
+                    'customer_id' => $mkopajiId,
                 ]);
             }
 
-            $akauntiUser = Auth::user();
+            // Attach guarantors
+            foreach ($request->wadhamini as $guarantorId) {
+                Mdhamini::create([
+                    'loan_id' => $loan->id,
+                    'customer_id' => $guarantorId,
+                ]);
+            }
 
-            $loanDescription = $loan->user->id == $akauntiUser->id 
-                ? 'yako' 
-                : 'ya '.$akauntiUser->jina_kamili;
+            $customers = Customer::whereIn('id', $request->wateja)->pluck('jina');
 
-            $loanDescriptionLog = $loan->user->id == $akauntiUser->id 
-            ? 'yake' 
-            : 'ya '.$akauntiUser->jina_kamili;
 
-            // Create loan log
+            if ($customers->isEmpty()) {
+                $names = 'Mteja';
+            } else {
+                // Format names into a string
+                if ($customers->count() == 1) {
+                    $names = $customers->first();
+                } elseif ($customers->count() == 2) {
+                    $names = $customers->join(' and ');
+                } else {
+                    $lastCustomer = $customers->pop(); // Get the last customer name
+                    $names = $customers->implode(', ') . ' pamoja na ' . $lastCustomer;
+                }
+            }
+
             Mabadiliko::create([
                 'loan_id' => $loan->id,
                 'performed_by' => Auth::id(),
                 'action' => 'created',
-                'description' => "Mkopo wa kiasi cha Tsh {$loan->amount} umeombwa na {$loan->user->jina_kamili} kupitia akaunti {$loanDescriptionLog}.",
+                'description' => "Mkopo wa kiasi cha Tsh {$loan->amount} umefunguliwa na {$user->jina_kamili} mwenye simu namba {$user->mobile}. Ombi la mkopo limewasilishwa na {$names}.",
             ]);
 
             $this->sendNotification(
-                "Umefanikiwa kutuma ombi la mkopo wa Tsh {$loan->amount} kupitia akaunti {$loanDescription}, ombi lako linashughulikiwa. Asante kwa kutumia mfumo wa kikundi.",
-                $request->mwombaMkopo,
-                $mkuu->id,
-                $request->kikundiId
-            );
-
-            $wadhamini = Mdhamini::with('user')
-                        ->where('loan_id', $loan->id)
-                        ->get();
-            foreach ($wadhamini as $mdhamini) {
-                $this->sendNotification(
-                    "Ombi lako la kumdhamini {$loan->user->jina_kamili} kuchukua mkopo wa {$loan->amount} limepokelewa. Asante kwa kutumia mfumo wa kikundi.",
-                    $mdhamini->user->id,
-                    $mkuu->id,
-                    $kikundi->id,
+                    "Hongera, mkopo wa {$names} umefunguliwa, boresha taarifa zaidi za mkopo huu kwenye Mikopo mipya ya {$request->loanType} kwenye eneo la wateja, Asante kwa kutumia mfumo wa mikopo center.",
+                    $user->id,
+                    null,
+                    $ofisi->id,
                 );
-            }
+
+            $this->sendNotificationKwaViongoziWengine("Mkopo mpya wa kiasi cha Tsh {$loan->amount} umefunguliwa na mtumishi {$user->jina_kamili} mwenye simu namba {$user->mobile}, wateja wa mkopo huo ni {$names}. Asante kwa kutumia mfumo wa mikopo center.", $ofisi->id, $user->id);
 
             DB::commit();
-            return response()->json(['message' => 'Ombi la mkopo limewasilishwa kikamilifu.', 'loan' => $loan], 200);
+            return response()->json([
+                'message' => 'Ombi la mkopo limewasilishwa kikamilifu.',
+                'loan' => $loan
+            ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['error' => 'Ombi la mkopo limeshindikana kuwasilishwa.', 'message' => $e->getMessage()], 500);
+            return response()->json([
+                'error' => 'Ombi la mkopo limeshindikana kuwasilishwa.',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 
     private function sendNotificationUongozi($messageContent, $ofisiId)
     {
-        $kikundi = Ofisi::find($ofisiId);
-        $groups = $kikundi->positionsWithUsers()->get();
+        $ofisi = Ofisi::find($ofisiId);
+        $groups = $ofisi->positionsWithUsers()->get();
         foreach ($groups as $group) {
             $users = $group['users'];
             $senderId = $group['users'][0]['id'];
@@ -130,11 +148,11 @@ class LoanController extends Controller
 
     private function sendNotificationKwaViongoziWengine($messageContent, $ofisiId, $userId)
     {
-        $kikundi = Ofisi::find($ofisiId);
-        $groups = $kikundi->positionsWithUsers()->get();
+        $ofisi = Ofisi::find($ofisiId);
+        $groups = $ofisi->positionsWithUsers()->get();
         foreach ($groups as $group) {
             $users = $group['users'];
-            $senderId = $group['users'][0]['id'];
+            $senderId = $userId;
             foreach ($users as $user) {
                 if($userId != $user->id){
                     $this->sendNotification($messageContent, $user['id'], $senderId, $ofisiId);

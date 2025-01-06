@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AinaController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\OfisiController;
 use App\Http\Controllers\Api\UploadController;
@@ -19,6 +20,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('sajiliMteja', [CustomerController::class, 'sajiliMteja']);
     Route::post('ondoaUnreadMeseji', [MessageController::class, 'ondoaUnreadMeseji']);
     Route::post('sajiliMakato', [AinaController::class, 'sajiliMakato']);
+    Route::post('sajiliMkopo', [LoanController::class, 'sajiliMkopo']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

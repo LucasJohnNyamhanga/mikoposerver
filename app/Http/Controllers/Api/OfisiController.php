@@ -91,8 +91,8 @@ class OfisiController extends Controller
 
     private function sendNotificationUongozi($messageContent, $ofisiId)
     {
-        $kikundi = Ofisi::find($ofisiId);
-        $groups = $kikundi->positionsWithUsers()->get();
+        $ofisi = Ofisi::find($ofisiId);
+        $groups = $ofisi->positionsWithUsers()->get();
         foreach ($groups as $group) {
             $users = $group['users'];
             $senderId = $group['users'][0]['id'];
