@@ -51,9 +51,15 @@ class LoanController extends Controller
                 ->exists();
 
             if ($loanExisting) {
-                return response()->json([
-                    'message' => 'Mmoja au zaidi ya wateja tayari wana mkopo unaoendelea au ombi lililopo.'
-                ], 401);
+                if ($request->loanType == 'kikundi') {
+                    return response()->json([
+                        'message' => 'Mteja mmoja au zaidi tayari ana ombi la mkopo au ana mkopo unaoendelea.'
+                    ], 401);
+                }else{
+                    return response()->json([
+                        'message' => 'Mteja tayari ana ombi la mkopo au ana mkopo unaoendelea.'
+                    ], 401);
+                }
             }
 
             // Create a loan
@@ -96,7 +102,7 @@ class LoanController extends Controller
                 if ($customers->count() == 1) {
                     $names = $customers->first();
                 } elseif ($customers->count() == 2) {
-                    $names = $customers->join(' and ');
+                    $names = $customers->join(' pamoja na ');
                 } else {
                     $lastCustomer = $customers->pop(); // Get the last customer name
                     $names = $customers->implode(', ') . ' pamoja na ' . $lastCustomer;
@@ -107,7 +113,7 @@ class LoanController extends Controller
                 'loan_id' => $loan->id,
                 'performed_by' => Auth::id(),
                 'action' => 'created',
-                'description' => "Mkopo wa kiasi cha Tsh {$loan->amount} umefunguliwa na {$user->jina_kamili} mwenye simu namba {$user->mobile}. Ombi la mkopo limewasilishwa na {$names}.",
+                'description' => "Mkopo wa kiasi cha Tsh {$loan->amount} umefunguliwa na afisa {$user->jina_kamili} mwenye simu namba {$user->mobile}. Ombi la mkopo limewasilishwa na {$names}.",
             ]);
 
             $this->sendNotification(
