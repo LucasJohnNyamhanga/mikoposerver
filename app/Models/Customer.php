@@ -40,6 +40,11 @@ class Customer extends Model
                     ->withTimestamps();
     }
 
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
     protected $fillable = [
         'jina',
         'jinaMaarufu',

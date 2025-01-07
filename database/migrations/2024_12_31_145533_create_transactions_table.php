@@ -26,6 +26,7 @@ return new class extends Migration
         $table->unsignedBigInteger('user_id');
         $table->unsignedBigInteger('ofisi_id');
         $table->unsignedBigInteger('loan_id')->nullable();
+        $table->unsignedBigInteger('customer_id')->nullable();
 
         $table->timestamps();
 
@@ -35,6 +36,7 @@ return new class extends Migration
         $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         $table->foreign('ofisi_id')->references('id')->on('ofisis')->onDelete('cascade');
         $table->foreign('loan_id')->references('id')->on('loans')->onDelete('cascade');
+        $table->foreign('customer_id')->references('id')->on('customers')->onDelete('cascade');
     });
 }
 

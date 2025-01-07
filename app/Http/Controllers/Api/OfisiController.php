@@ -67,15 +67,17 @@ class OfisiController extends Controller
                             ,'loans' => function ($query) {
                             $query->with(['customers','user','transactions'=> function ($query) {
                                 $query->with([
-                                    'user','approver','creator'
+                                    'user','approver','creator','customer'
                                 ])->latest();
                             }
                             ,'wadhamini','dhamana','mabadiliko'=> function ($query) {
                                 $query->latest();
                             }
-                            ])->latest();
+                            ])->whereIn('status', ['approved','defaulted',])->latest();
                         },'transactions'=> function ($query) {
-                                $query->latest();
+                                $query->with([
+                                    'user','approver','creator','customer'
+                                ])->whereDate('created_at', now()->toDateString()) ->latest();//get only today's transactions
                             },'ainamikopo'])->where('id', $ofisi->id)->first();
 
             return response()->json([
