@@ -11,6 +11,7 @@ use App\Models\Mabadiliko;
 use App\Models\Mdhamini;
 use App\Models\Message;
 use App\Models\Ofisi;
+use App\Models\UserOfisi;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -137,6 +138,47 @@ class LoanController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function getMikopoMipya(LoanRequest $request)
+    {
+
+        $user = Auth::user();
+
+        if (!$user) {
+            // Return error if user is not found
+            return response()->json(['message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'], 401);
+        }
+
+        // Check if the user has an active Kikundi
+        if ($user->activeOfisi) {
+            // Retrieve the KikundiUser record to get the position and the Kikundi details
+            $userOfisi = UserOfisi::where('user_id', $user->id)
+                                ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                                ->first();
+
+            $ofisi = $userOfisi->ofisi;
+            
+
+            $mikopoOfisi = Ofisi::with(['loans' => function ($query) {
+                            $query->with(['customers','user','transactions'=> function ($query) {
+                                $query->with([
+                                    'user','approver','creator','customer'
+                                ])->latest();
+                            }
+                            ,'wadhamini','dhamana','mabadiliko'=> function ($query) {
+                                $query->latest();
+                            }
+                            ])->whereIn('status', ['pending'])->latest();
+                        }])->where('id', $ofisi->id)
+                        ->first();
+            
+            return response()->json([
+            'kikundi' => $mikopoOfisi,
+            ], 200);
+        }
+
+        return response()->json(['message' => 'Huna usajili kwenye kikundi chochote. Piga simu msaada 0784477999'], 401);
     }
 
     private function sendNotificationUongozi($messageContent, $ofisiId)
