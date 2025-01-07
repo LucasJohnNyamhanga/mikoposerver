@@ -91,6 +91,7 @@ class Loan extends Model
         'ofisi_id',
         'user_id',
         'status_details',
+        'jina_kikundi',
     ];
 
 }

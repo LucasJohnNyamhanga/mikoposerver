@@ -22,6 +22,7 @@ class LoanController extends Controller
     {
         // Validate input
         $validator = Validator::make($request->all(), [
+            'jinaKikundi' => 'nullable|string|max:255',
             'amount' => 'required|numeric|min:0',
             'riba' => 'required|numeric|min:0|max:100',
             'fomu' => 'required|numeric|min:0|max:100',
@@ -74,6 +75,7 @@ class LoanController extends Controller
                 'loan_type' => $request->loanType,
                 'user_id' => $request->userId,
                 'ofisi_id' => $request->ofisiId,
+                'jina_kikundi' => $request->jinaKikundi,
                 'status' => 'pending',
             ]);
 

@@ -20,6 +20,7 @@ return new class extends Migration
             $table->enum('status', ['pending','waiting','error','approved','repaid','defaulted','closed'])->default('pending');
             $table->enum('kipindi_malipo', ['siku', 'wiki', 'mwezi', 'mwaka']);
             $table->enum('loan_type', ['kikundi', 'binafsi']);
+            $table->longText('jina_kikundi')->nullable();
             $table->integer('muda_malipo')->nullable();
             $table->dateTime('issued_date')->nullable();
             $table->dateTime('due_date')->nullable();
