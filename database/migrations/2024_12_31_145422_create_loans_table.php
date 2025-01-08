@@ -13,10 +13,10 @@ return new class extends Migration
     {
         Schema::create('loans', function (Blueprint $table) {
             $table->id();
-            $table->decimal('amount', 15, 2);
-            $table->decimal('riba', 5, 2)->default(10);
-            $table->decimal('fomu', 5, 2)->default(10);
-            $table->decimal('total_due', 15, 2)->nullable();
+            $table->decimal('amount', 20, 2);
+            $table->decimal('riba',20, 2)->default(10);
+            $table->decimal('fomu', 20, 2)->default(10);
+            $table->decimal('total_due', 20, 2)->nullable();
             $table->enum('status', ['pending','waiting','error','approved','repaid','defaulted','closed'])->default('pending');
             $table->enum('kipindi_malipo', ['siku', 'wiki', 'mwezi', 'mwaka']);
             $table->enum('loan_type', ['kikundi', 'binafsi']);

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('dhamanas', function (Blueprint $table) {
             $table->id();
             $table->string('jina');
-            $table->decimal('thamani', 5, 2);
+            $table->decimal('thamani', 20, 2);
             $table->string('maelezo');
             $table->string('picha');
             $table->boolean('is_ofisi_owned')->default(false);

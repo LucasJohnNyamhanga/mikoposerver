@@ -17,7 +17,7 @@ return new class extends Migration
         $table->enum('category', ['fomu', 'rejesho', 'tumizi', 'faini', 'mkopo','mtaji','gawio','yakutolea']);
         $table->enum('status', ['pending', 'completed', 'failed']);
         $table->enum('method', ['bank', 'mpesa', 'halopesa','airtelmoney','tigopesa','cash'])->nullable();
-        $table->decimal('amount', 15, 2);
+        $table->decimal('amount', 20, 2);
         $table->longText('description')->nullable();
 
         // Foreign keys
