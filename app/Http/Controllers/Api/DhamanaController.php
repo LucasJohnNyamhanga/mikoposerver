@@ -75,7 +75,7 @@ class DhamanaController extends Controller
             ]);
 
             $this->sendNotification(
-                    "Hongera, dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} imesajiliwa kikamilifu kwa mkopo wa Tsh {$loan->amount}, kwa msaada piga simu namba {$helpNumber}, Asante.",
+                    "Hongera, dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} imesajiliwa kikamilifu kwa ajili ya mkopo wa Tsh {$loan->amount}, kwa msaada piga simu namba {$helpNumber}, Asante.",
                     $user->id,
                     null,
                     $ofisi->id,
