@@ -24,6 +24,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('sajiliMkopo', [LoanController::class, 'sajiliMkopo']);
     Route::get('getMikopoMipya', [LoanController::class, 'getMikopoMipya']);
     Route::post('sajiliDhamana', [DhamanaController::class, 'sajiliDhamana']);
+    Route::post('ondoaDhamana', [DhamanaController::class, 'ondoaDhamana']);
+    Route::post('ombaPitishaMkopo', [LoanController::class, 'ombaPitishaMkopo']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

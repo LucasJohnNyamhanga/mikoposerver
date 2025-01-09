@@ -9,6 +9,7 @@ use App\Models\Dhamana;
 use App\Models\Loan;
 use App\Models\Message;
 use App\Models\Ofisi;
+use App\Models\UserOfisi;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -97,6 +98,82 @@ class DhamanaController extends Controller
             if (file_exists($filePath)) {
                 unlink($filePath);
             }
+            return response()->json([
+                'message' => 'Hitilafu : ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function ondoaDhamana(DhamanaRequest $request)
+    {
+        DB::beginTransaction();
+
+        try {
+        // Validate the incoming request
+            $validator = Validator::make($request->all(), [
+                'dhamanaId' => 'required|exists:dhamanas,id',
+            ]);
+
+            $appName = env('APP_NAME');
+            $helpNumber = env('APP_HELP');
+
+            // If validation fails, return a response with error messages
+            if ($validator->fails()) {
+
+                throw new \Exception("Jaza maeneo yote yaliyowazi kuendelea.");
+            }
+
+            $user = Auth::user();
+
+            if (!$user) {
+                throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+            }
+
+            if (!$user->activeOfisi) {
+                throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+            }
+            // Retrieve the KikundiUser record to get the position and the Kikundi details
+            $userOfisi = UserOfisi::where('user_id', $user->id)
+                                ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                                ->first();
+
+            $ofisi = $userOfisi->ofisi;
+
+            $dhamana = Dhamana::find($request->dhamanaId);
+
+            if (!$dhamana) {
+                throw new \Exception("Dhamana unayohitaji kuifuta haijapatikana au tayari imeshafutwa");
+            }
+
+            $mteja = Customer::find($dhamana->customer_id);
+
+            $this->sendNotification(
+                "Hongera, dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} imefutwa kikamilifu, kwa msaada piga simu namba {$helpNumber}, Asante.",
+                $user->id,
+                null,
+                $ofisi->id,
+            );
+
+            $this->sendNotificationKwaViongoziWengine("Dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} anayeomba mkopo, imefutwa kikamilifu. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}, Asante.", $ofisi->id, $user->id);
+
+            $baseUrl = env('APP_URL');
+            $imagePath = $dhamana->picha;
+            
+            $filePathImage = trim(str_replace($baseUrl, '', $imagePath));
+            $filePath = public_path($filePathImage);
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+
+            $dhamana->delete();
+
+            DB::commit();
+
+            return response()->json(['message' => 'Dhamana ya mteja imefutwa kikamilifu'], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
             return response()->json([
                 'message' => 'Hitilafu : ' . $e->getMessage()
             ], 500);

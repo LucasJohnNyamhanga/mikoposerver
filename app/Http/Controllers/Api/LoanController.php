@@ -142,6 +142,114 @@ class LoanController extends Controller
         }
     }
 
+    public function ombaPitishaMkopo(LoanRequest $request)
+    {   
+         // Validate input
+        $validator = Validator::make($request->all(), [
+            'jinaKikundi' => 'nullable|string|max:255',
+            'amount' => 'required|numeric|min:0',
+            'riba' => 'required|numeric|min:0|max:100',
+            'fomu' => 'required|numeric|min:0|max:100',
+            'totalDue' => 'required|numeric|min:0',
+            'kipindiMalipo' => 'required|in:siku,wiki,mwezi,mwaka',
+            'mudaMalipo' => 'nullable|integer|min:1',
+            'userId' => 'required|exists:users,id',
+            'ofisiId' => 'required|exists:ofisis,id',
+            'loanId' => 'required|exists:loans,id',
+            'loanType' => 'required|in:kikundi,binafsi',
+            'wateja' => 'nullable|array',
+            'wateja.*' => 'exists:customers,id',
+            'wadhamini' => 'nullable|array',
+            'wadhamini.*' => 'exists:customers,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $user = Auth::user();
+            $helpNumber = env('APP_HELP');
+
+            if (!$user) {
+                throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+            }
+
+            if (!$user->activeOfisi) {
+                throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+            }
+
+            // Retrieve the KikundiUser record to get the position and the Kikundi details
+            $userOfisi = UserOfisi::where('user_id', $user->id)
+                                ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                                ->first();
+
+            $ofisi = $userOfisi->ofisi;
+
+            $loan = Loan::findOrFail($request->loanId);
+
+            $loan->update([
+                'amount' => $request->amount,
+                'riba' => $request->riba,
+                'fomu' => $request->fomu,
+                'total_due' => $request->totalDue,
+                'kipindi_malipo' => $request->kipindiMalipo,
+                'muda_malipo' => $request->mudaMalipo,
+                'loan_type' => $request->loanType,
+                'user_id' => $request->userId,
+                'ofisi_id' => $request->ofisiId,
+                'jina_kikundi' => $request->jinaKikundi,
+                'status' => 'waiting',
+            ]);
+
+            // Handle Loan Customers
+            if ($request->has('wateja')) {
+                LoanCustomer::where('loan_id', $loan->id)->delete();
+                $loanCustomers = array_map(fn($id) => ['loan_id' => $loan->id, 'customer_id' => $id], $request->wateja);
+                LoanCustomer::insert($loanCustomers);
+            }
+
+            // Handle Guarantors
+            if ($request->has('wadhamini')) {
+                Mdhamini::where('loan_id', $loan->id)->delete();
+                $guarantors = array_map(fn($id) => ['loan_id' => $loan->id, 'customer_id' => $id], $request->wadhamini);
+                Mdhamini::insert($guarantors);
+            }
+
+            // Format customer names
+            $customers = Customer::whereIn('id', $request->wateja)->pluck('jina');
+            $names = $customers->join(', ', ' pamoja na ');
+
+            Mabadiliko::create([
+                'loan_id' => $loan->id,
+                'performed_by' => Auth::id(),
+                'action' => 'updated',
+                'description' => "Ombi la mkopo wa kiasi cha Tsh {$loan->amount} linasubili uhakiki na kupitishwa. Afisa mwasilishi ni {$user->jina_kamili}. Majina ya wakopaji ni {$names}.",
+            ]);
+
+            $this->sendNotification(
+                "Ombi la mkopo wa Tsh {$loan->amount} wa {$names} limewasilishwa na linasubili uhakiki na kupitishwa.",
+                $user->id,
+                null,
+                $ofisi->id
+            );
+
+            $this->sendNotificationKwaViongoziWengine(
+                "Ombi la mkopo la kiasi cha Tsh {$loan->amount} la {$names} linasubilia uhakiki na kupitishwa. Limewasilishwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}.",
+                $ofisi->id,
+                $user->id
+            );
+
+            DB::commit();
+            return response()->json(['message' => 'Ombi la mkopo limewasilishwa kikamilifu.', 'loan' => $loan], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'Ombi la mkopo limeshindikana kuwasilishwa.', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+
     public function getMikopoMipya(LoanRequest $request)
     {
 
