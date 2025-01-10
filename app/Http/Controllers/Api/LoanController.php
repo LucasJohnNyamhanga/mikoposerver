@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Http\Controllers\Api;
-
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoanRequest;
 use App\Models\Customer;
@@ -18,6 +17,7 @@ use Illuminate\Support\Facades\Validator;
 
 class LoanController extends Controller
 {
+    
     public function sajiliMkopo(LoanRequest $request)
     {
         // Validate input
@@ -46,6 +46,8 @@ class LoanController extends Controller
         try {
             $ofisi = Ofisi::find($request->ofisiId);
             $user = Auth::user();
+            $appName = env('APP_NAME');
+            $helpNumber = env('APP_HELP');
 
             // Check if any of the customers already have active loans
             $loanExisting = Loan::whereIn('user_id', $request->wateja)
@@ -120,7 +122,7 @@ class LoanController extends Controller
             ]);
 
             $this->sendNotification(
-                    "Hongera, mkopo wa {$names} umefunguliwa, boresha taarifa zaidi za mkopo huu kwenye Mikopo mipya ya {$request->loanType} kwenye eneo la wateja, Asante kwa kutumia mfumo wa mikopo center.",
+                    "Hongera, mkopo wa {$names} umefunguliwa, boresha taarifa zaidi za mkopo huu kwenye Mikopo mipya ya {$request->loanType} kwenye eneo la wateja, Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                     $user->id,
                     null,
                     $ofisi->id,
@@ -171,6 +173,7 @@ class LoanController extends Controller
         try {
             $user = Auth::user();
             $helpNumber = env('APP_HELP');
+            $appName = env('APP_NAME');
 
             if (!$user) {
                 throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
@@ -217,6 +220,8 @@ class LoanController extends Controller
                 Mdhamini::insert($guarantors);
             }
 
+            
+
             // Format customer names
             $customers = Customer::whereIn('id', $request->wateja)->pluck('jina');
             $names = $customers->join(', ', ' pamoja na ');
@@ -229,14 +234,14 @@ class LoanController extends Controller
             ]);
 
             $this->sendNotification(
-                "Ombi la mkopo wa Tsh {$loan->amount} wa {$names} limewasilishwa na linasubili uhakiki na kupitishwa.",
+                "Ombi la mkopo wa Tsh {$loan->amount} wa {$names} limewasilishwa na linasubili uhakiki na kupitishwa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                 $user->id,
                 null,
                 $ofisi->id
             );
 
             $this->sendNotificationKwaViongoziWengine(
-                "Ombi la mkopo la kiasi cha Tsh {$loan->amount} la {$names} linasubilia uhakiki na kupitishwa. Limewasilishwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}.",
+                "Ombi la mkopo la kiasi cha Tsh {$loan->amount} la {$names} linasubilia uhakiki na kupitishwa. Limewasilishwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                 $ofisi->id,
                 $user->id
             );
@@ -330,6 +335,151 @@ class LoanController extends Controller
         }
 
         return response()->json(['message' => 'Huna usajili kwenye kikundi chochote. Piga simu msaada 0784477999'], 401);
+    }
+
+    public function pitishaMkopo(LoanRequest $request)
+    {   
+         // Validate input
+        $validator = Validator::make($request->all(), [
+            'loanId' => 'required|exists:loans,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $user = Auth::user();
+            $helpNumber = env('APP_HELP');
+            $appName = env('APP_NAME');
+
+            if (!$user) {
+                throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+            }
+
+            if (!$user->activeOfisi) {
+                throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+            }
+
+            // Retrieve the KikundiUser record to get the position and the Kikundi details
+            $userOfisi = UserOfisi::where('user_id', $user->id)
+                                ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                                ->first();
+
+            $ofisi = $userOfisi->ofisi;
+
+            $loan = Loan::findOrFail($request->loanId);
+
+            $loan->update([
+                'status' => 'approved',
+            ]);
+
+            
+
+            // Handle Loan Customers
+            $customers = $loan->customers->pluck('jina');
+            $names = $customers->join(', ', ' pamoja na ');
+
+            Mabadiliko::create([
+                'loan_id' => $loan->id,
+                'performed_by' => Auth::id(),
+                'action' => 'updated',
+                'description' => "Mkopo wa kiasi cha Tsh {$loan->amount}, wa {$names} umepitishwa na {$user->jina_kamili} wa simu namba {$user->mobile}.",
+            ]);
+
+            $this->sendNotification(
+                "Mkopo wa Tsh {$loan->amount} wa {$names} umepitishwa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $user->id,
+                null,
+                $ofisi->id
+            );
+
+            $this->sendNotificationKwaViongoziWengine(
+                "Ombi la mkopo la kiasi cha Tsh {$loan->amount} la {$names} limepitishwa. Limepitishwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $ofisi->id,
+                $user->id
+            );
+
+            DB::commit();
+            return response()->json(['message' => 'Ombi la mkopo limepitishwa kikamilifu.', 'loan' => $loan], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'Ombi la mkopo limeshindikana kupitishwa.', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function batilishaMkopo(LoanRequest $request)
+    {   
+         // Validate input
+        $validator = Validator::make($request->all(), [
+            'loanId' => 'required|exists:loans,id',
+            'error' => 'required|string|max:15',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $user = Auth::user();
+            $helpNumber = env('APP_HELP');
+            $appName = env('APP_NAME');
+
+            if (!$user) {
+                throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+            }
+
+            if (!$user->activeOfisi) {
+                throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+            }
+
+            // Retrieve the KikundiUser record to get the position and the Kikundi details
+            $userOfisi = UserOfisi::where('user_id', $user->id)
+                                ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                                ->first();
+
+            $ofisi = $userOfisi->ofisi;
+
+            $loan = Loan::findOrFail($request->loanId);
+
+            $loan->update([
+                'status' => 'error',
+                'status_details' => $request->error,
+            ]);
+
+            
+
+            $customers = $loan->customers->pluck('jina');
+            $names = $customers->join(', ', ' pamoja na ');
+
+            Mabadiliko::create([
+                'loan_id' => $loan->id,
+                'performed_by' => Auth::id(),
+                'action' => 'updated',
+                'description' => "Mkopo wa kiasi cha Tsh {$loan->amount}, wa {$names} umebatilishwa na kuwekewa kasoro ya {$request->error} na {$user->jina_kamili} wa simu namba {$user->mobile}.",
+            ]);
+
+            $this->sendNotification(
+                "Mkopo wa Tsh {$loan->amount} wa {$names} umebatilishwa na kuwekewa kasoro ya {$request->error}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $user->id,
+                null,
+                $ofisi->id
+            );
+
+            $this->sendNotificationKwaViongoziWengine(
+                "Ombi la mkopo la kiasi cha Tsh {$loan->amount} la {$names} limebatilishwa na kuwekewa kasoro ya {$request->error}. limekataliwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $ofisi->id,
+                $user->id
+            );
+
+            DB::commit();
+            return response()->json(['message' => 'Ombi la mkopo limewekewa kasoro kikamilifu.', 'loan' => $loan], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'Ombi la mkopo limeshindikana kuwekewa kasoro.', 'message' => $e->getMessage()], 500);
+        }
     }
 
     private function sendNotificationUongozi($messageContent, $ofisiId)

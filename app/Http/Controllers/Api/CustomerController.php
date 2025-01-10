@@ -69,7 +69,7 @@ class CustomerController extends Controller
                     $ofisi->id,
                 );
 
-                $this->sendNotificationKwaViongoziWengine("Mteja mpya {$mteja->jina} amesajiliwa kikamilifu, anaweza kuombewa mkopo mpya au kutumika kama mdhamini wa mkopo. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}, Asante.", $ofisi->id, $user->id);
+                $this->sendNotificationKwaViongoziWengine("Mteja mpya {$mteja->jina} amesajiliwa kikamilifu, anaweza kuombewa mkopo mpya au kutumika kama mdhamini wa mkopo. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.", $ofisi->id, $user->id);
 
             DB::commit();
 
