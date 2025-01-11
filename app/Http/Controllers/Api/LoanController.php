@@ -14,6 +14,7 @@ use App\Models\UserOfisi;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
 
 class LoanController extends Controller
 {
@@ -79,6 +80,7 @@ class LoanController extends Controller
                 'ofisi_id' => $request->ofisiId,
                 'jina_kikundi' => $request->jinaKikundi,
                 'status' => 'pending',
+                'status_details' => null,
             ]);
 
             // Attach wateja
@@ -204,6 +206,7 @@ class LoanController extends Controller
                 'ofisi_id' => $request->ofisiId,
                 'jina_kikundi' => $request->jinaKikundi,
                 'status' => 'waiting',
+                'status_details' => null,
             ]);
 
             // Handle Loan Customers
@@ -342,6 +345,8 @@ class LoanController extends Controller
          // Validate input
         $validator = Validator::make($request->all(), [
             'loanId' => 'required|exists:loans,id',
+            'mwanzoMkopo' => 'required|string|max:255',
+            'mwishoMkopo' => 'required|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -373,6 +378,9 @@ class LoanController extends Controller
 
             $loan->update([
                 'status' => 'approved',
+                'issued_date' =>  Carbon::parse($request->mwanzoMkopo),
+                'due_date' =>  Carbon::parse($request->mwishoMkopo),
+                'status_details' => null,
             ]);
 
             
@@ -409,12 +417,53 @@ class LoanController extends Controller
         }
     }
 
+    public function getMikopoKasoro(LoanRequest $request)
+    {
+
+        $user = Auth::user();
+
+        if (!$user) {
+            // Return error if user is not found
+            return response()->json(['message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'], 401);
+        }
+
+        // Check if the user has an active Kikundi
+        if ($user->activeOfisi) {
+            // Retrieve the KikundiUser record to get the position and the Kikundi details
+            $userOfisi = UserOfisi::where('user_id', $user->id)
+                                ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                                ->first();
+
+            $ofisi = $userOfisi->ofisi;
+            
+
+            $mikopoOfisi = Ofisi::with(['loans' => function ($query) {
+                            $query->with(['customers','user','transactions'=> function ($query) {
+                                $query->with([
+                                    'user','approver','creator','customer'
+                                ])->latest();
+                            }
+                            ,'wadhamini','dhamana','mabadiliko'=> function ($query) {
+                                $query->latest();
+                            }
+                            ])->whereIn('status', ['error'])->latest();
+                        }])->where('id', $ofisi->id)
+                        ->first();
+            
+            return response()->json([
+            'kikundi' => $mikopoOfisi,
+            ], 200);
+        }
+
+        return response()->json(['message' => 'Huna usajili kwenye kikundi chochote. Piga simu msaada 0784477999'], 401);
+    }
+
     public function batilishaMkopo(LoanRequest $request)
     {   
          // Validate input
         $validator = Validator::make($request->all(), [
             'loanId' => 'required|exists:loans,id',
-            'error' => 'required|string|max:15',
+            'error' => 'required|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -449,8 +498,6 @@ class LoanController extends Controller
                 'status_details' => $request->error,
             ]);
 
-            
-
             $customers = $loan->customers->pluck('jina');
             $names = $customers->join(', ', ' pamoja na ');
 
@@ -462,14 +509,14 @@ class LoanController extends Controller
             ]);
 
             $this->sendNotification(
-                "Mkopo wa Tsh {$loan->amount} wa {$names} umebatilishwa na kuwekewa kasoro ya {$request->error}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Mkopo wa {$loan->loan_type} wa Tsh {$loan->amount} wa {$names} unakasoro ya {$request->error}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                 $user->id,
                 null,
                 $ofisi->id
             );
 
             $this->sendNotificationKwaViongoziWengine(
-                "Ombi la mkopo la kiasi cha Tsh {$loan->amount} la {$names} limebatilishwa na kuwekewa kasoro ya {$request->error}. limekataliwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Ombi la mkopo wa {$loan->loan_type} la kiasi cha Tsh {$loan->amount} la {$names} lina kasoro ya {$request->error}. limekataliwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                 $ofisi->id,
                 $user->id
             );

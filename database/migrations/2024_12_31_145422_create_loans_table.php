@@ -18,7 +18,7 @@ return new class extends Migration
             $table->decimal('fomu', 20, 2)->default(10);
             $table->decimal('total_due', 20, 2)->nullable();
             $table->enum('status', ['pending','waiting','error','approved','repaid','defaulted','closed'])->default('pending');
-            $table->enum('kipindi_malipo', ['siku', 'wiki', 'mwezi', 'mwaka']);
+            $table->enum('kipindi_malipo', ['siku', 'wiki', 'mwezi']);
             $table->enum('loan_type', ['kikundi', 'binafsi']);
             $table->longText('jina_kikundi')->nullable();
             $table->integer('muda_malipo')->nullable();
