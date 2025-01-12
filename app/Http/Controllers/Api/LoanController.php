@@ -50,21 +50,19 @@ class LoanController extends Controller
             $appName = env('APP_NAME');
             $helpNumber = env('APP_HELP');
 
-            // Check if any of the customers already have active loans
-            $loanExisting = Loan::whereIn('user_id', $request->wateja)
-                ->whereIn('status', ['pending', 'approved', 'defaulted', 'error'])
+            // Check if any of the selected customers already have active loans
+            $loanExisting = DB::table('loan_customers')
+                ->join('loans', 'loan_customers.loan_id', '=', 'loans.id')
+                ->whereIn('loan_customers.customer_id', $request->wateja)
+                ->whereIn('loans.status', ['pending', 'approved', 'defaulted', 'error'])
                 ->exists();
 
+            // Respond based on loan type
             if ($loanExisting) {
-                if ($request->loanType == 'kikundi') {
-                    return response()->json([
-                        'message' => 'Mteja mmoja au zaidi tayari ana ombi la mkopo au ana mkopo unaoendelea.'
-                    ], 401);
-                }else{
-                    return response()->json([
-                        'message' => 'Mteja tayari ana ombi la mkopo au ana mkopo unaoendelea.'
-                    ], 401);
-                }
+                $message = $request->loanType === 'kikundi'
+                    ? 'Mteja mmoja au zaidi tayari ana ombi la mkopo au ana mkopo unaoendelea.'
+                    : 'Mteja tayari ana ombi la mkopo au ana mkopo unaoendelea.';
+                throw new \Exception("{$message}");
             }
 
             // Create a loan
@@ -233,7 +231,7 @@ class LoanController extends Controller
                 'loan_id' => $loan->id,
                 'performed_by' => Auth::id(),
                 'action' => 'updated',
-                'description' => "Ombi la mkopo wa kiasi cha Tsh {$loan->amount} linasubili uhakiki na kupitishwa. Afisa mwasilishi ni {$user->jina_kamili}. Majina ya wakopaji ni {$names}.",
+                'description' => "Ombi la mkopo wa kiasi cha Tsh {$loan->amount} linasubili uhakiki na kupitishwa. Afisa mwasilishi ni {$user->jina_kamili} mwenye namba {$user->mobile}. Majina ya wakopaji ni {$names}.",
             ]);
 
             $this->sendNotification(

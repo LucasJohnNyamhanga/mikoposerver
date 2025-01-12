@@ -16,7 +16,7 @@ return new class extends Migration
         $table->enum('type', ['kuweka', 'kutoa']);
         $table->enum('category', ['fomu', 'rejesho', 'tumizi', 'faini', 'mkopo','mtaji','gawio','yakutolea']);
         $table->enum('status', ['pending', 'completed', 'failed']);
-        $table->enum('method', ['bank', 'mpesa', 'halopesa','airtelmoney','tigopesa','cash'])->nullable();
+        $table->enum('method', ['benki', 'mpesa', 'halopesa','airtelmoney','tigopesa','cash'])->nullable();
         $table->decimal('amount', 20, 2);
         $table->longText('description')->nullable();
 
@@ -39,8 +39,6 @@ return new class extends Migration
         $table->foreign('customer_id')->references('id')->on('customers')->onDelete('cascade');
     });
 }
-
-
     /**
      * Reverse the migrations.
      */

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DhamanaController;
 use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\MiamalaController;
 use App\Http\Controllers\Api\OfisiController;
 use App\Http\Controllers\Api\UploadController;
 use Illuminate\Http\Request;
@@ -30,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('pitishaMkopo', [LoanController::class, 'pitishaMkopo']);
     Route::post('batilishaMkopo', [LoanController::class, 'batilishaMkopo']);
     Route::get('getMikopoKasoro', [LoanController::class, 'getMikopoKasoro']);
+    Route::post('lipiaRejesho', [MiamalaController::class, 'lipiaRejesho']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

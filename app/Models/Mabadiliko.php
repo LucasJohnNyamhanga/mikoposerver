@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Mabadiliko extends Model
 {
-     protected $fillable = [
+    protected $fillable = [
         'loan_id',
         'performed_by',
         'action',

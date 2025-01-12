@@ -38,4 +38,19 @@ class Transaction extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    protected $fillable = [
+        'type',
+        'category',
+        'status',
+        'method',
+        'amount',
+        'description',
+        'created_by',
+        'approved_by',
+        'user_id',
+        'ofisi_id',
+        'loan_id',
+        'customer_id',
+    ];
 }
