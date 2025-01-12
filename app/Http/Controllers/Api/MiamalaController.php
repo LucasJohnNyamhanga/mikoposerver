@@ -27,6 +27,7 @@ class MiamalaController extends Controller
             'description' => 'required|string|max:255',
             'ofisiId' => 'required|exists:ofisis,id',
             'loanId' => 'required|exists:loans,id',
+            'mtejaId' => 'required|exists:customers,id',
         ]);
 
         if ($validator->fails()) {
@@ -55,6 +56,7 @@ class MiamalaController extends Controller
                 'approved_by' => $user->id,
                 'ofisi_id' => $ofisi->id,
                 'loan_id' => $request->loanId,
+                'customer_id' => $request->mtejaId,
             ]);
 
             // Retrieve the loan and associated customers
