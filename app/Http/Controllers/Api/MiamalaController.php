@@ -40,8 +40,8 @@ class MiamalaController extends Controller
             $ofisi = Ofisi::findOrFail($request->ofisiId); // Ensure the office exists
             $user = Auth::user();
 
-            $appName = config('app.name'); // Use Laravel's config helper for environment variables
-            $helpNumber = config('app.help'); // Custom key for help number
+            $appName = env('APP_NAME');
+            $helpNumber = env('APP_HELP');
 
             // Create the transaction record
             $transaction = Transaction::create([
@@ -96,6 +96,80 @@ class MiamalaController extends Controller
             DB::rollBack();
             return response()->json([
                 'error' => 'Rejesho limeshindikana kupokelewa.',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function lipiaFaini(MiamalaRequest $request)
+    {
+        // Validate input
+        $validator = Validator::make($request->all(), [
+            'type' => 'required|string|max:255',
+            'category' => 'required|string|max:255',
+            'status' => 'required|string|max:255',
+            'method' => 'required|string|max:255',
+            'amount' => 'required|numeric',
+            'description' => 'required|string|max:255',
+            'ofisiId' => 'required|exists:ofisis,id',
+            'mtejaId' => 'required|exists:customers,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $ofisi = Ofisi::findOrFail($request->ofisiId); // Ensure the office exists
+            $user = Auth::user();
+
+            $appName = env('APP_NAME');
+            $helpNumber = env('APP_HELP');
+
+            // Create the transaction record
+            Transaction::create([
+                'type' => $request->type,
+                'category' => $request->category,
+                'status' => $request->status,
+                'method' => $request->method,
+                'amount' => $request->amount,
+                'description' => $request->description,
+                'created_by' => $user->id,
+                'user_id' => $user->id,
+                'approved_by' => $user->id,
+                'ofisi_id' => $ofisi->id,
+                'loan_id' => null,
+                'customer_id' => $request->mtejaId,
+            ]);
+
+            $mteja = Customer::findOrFail($request->mtejaId);
+
+            // Send notifications
+            $this->sendNotification(
+                "Imethibitishwa faini ya Tsh {$request->amount} ya mteja {$mteja->jina} imepokelewa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $user->id,
+                null,
+                $ofisi->id
+            );
+
+            $this->sendNotificationKwaViongoziWengine(
+                "Imethibitishwa faini ya Tsh {$request->amount} ya mteja {$mteja->jina} imepokelewa kwa sababu ya {$request->description} na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $ofisi->id,
+                $user->id
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Faini imepokelewa kikamilifu.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Faini imeshindikana kupokelewa.',
                 'message' => $e->getMessage()
             ], 500);
         }

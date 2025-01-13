@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoanRequest;
 use App\Models\Customer;
+use App\Models\Dhamana;
 use App\Models\Loan;
 use App\Models\LoanCustomer;
 use App\Models\Mabadiliko;
 use App\Models\Mdhamini;
 use App\Models\Message;
 use App\Models\Ofisi;
+use App\Models\Position;
+use App\Models\Transaction;
 use App\Models\UserOfisi;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -227,22 +230,34 @@ class LoanController extends Controller
             $customers = Customer::whereIn('id', $request->wateja)->pluck('jina');
             $names = $customers->join(', ', ' pamoja na ');
 
+            // Format dhamana names
+            $dhamana = Dhamana::where('loan_id', $loan->id)->get();
+
+            // Extract the names of the dhamanas
+            $dhamanaNames = $dhamana->pluck('jina')->join(', ', ' pamoja na ');
+
+            // Calculate the total sum of 'thamani' column
+            $totalThamani = $dhamana->sum('thamani');
+
+
             Mabadiliko::create([
                 'loan_id' => $loan->id,
                 'performed_by' => Auth::id(),
                 'action' => 'updated',
-                'description' => "Ombi la mkopo wa kiasi cha Tsh {$loan->amount} linasubili uhakiki na kupitishwa. Afisa mwasilishi ni {$user->jina_kamili} mwenye namba {$user->mobile}. Majina ya wakopaji ni {$names}.",
+                'description' => "Ombi la mkopo wa kiasi cha Tsh {$loan->amount} linasubili uhakiki na kupitishwa likiwa na dhamana {$dhamanaNames}, yenye jumla ya thamani ya {$totalThamani}. Afisa mwasilishi ni {$user->jina_kamili} mwenye namba {$user->mobile}. Majina ya wakopaji ni {$names}.",
             ]);
 
+            
+
             $this->sendNotification(
-                "Ombi la mkopo wa Tsh {$loan->amount} wa {$names} limewasilishwa na linasubili uhakiki na kupitishwa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Ombi la mkopo wa Tsh {$loan->amount} wa {$names} limewasilishwa  likiwa na dhamana {$dhamanaNames}, yenye jumla ya thamani ya {$totalThamani} na linasubili uhakiki na kupitishwa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                 $user->id,
                 null,
                 $ofisi->id
             );
 
             $this->sendNotificationKwaViongoziWengine(
-                "Ombi la mkopo la kiasi cha Tsh {$loan->amount} la {$names} linasubilia uhakiki na kupitishwa. Limewasilishwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Ombi la mkopo la kiasi cha Tsh {$loan->amount} la {$names} linasubilia uhakiki na kupitishwa likiwa na dhamana {$dhamanaNames}, yenye jumla ya thamani ya {$totalThamani}. Limewasilishwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                 $ofisi->id,
                 $user->id
             );
@@ -372,6 +387,18 @@ class LoanController extends Controller
 
             $ofisi = $userOfisi->ofisi;
 
+            $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
+
+            $position = $ofisi->pivot->position_id;
+
+            $positionRecord = Position::find($position);
+
+            if (!$positionRecord) {
+                throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+            }
+
+            $cheo = $positionRecord->name;
+
             $loan = Loan::findOrFail($request->loanId);
 
             $loan->update([
@@ -381,8 +408,6 @@ class LoanController extends Controller
                 'status_details' => null,
             ]);
 
-            
-
             // Handle Loan Customers
             $customers = $loan->customers->pluck('jina');
             $names = $customers->join(', ', ' pamoja na ');
@@ -391,7 +416,41 @@ class LoanController extends Controller
                 'loan_id' => $loan->id,
                 'performed_by' => Auth::id(),
                 'action' => 'updated',
-                'description' => "Mkopo wa kiasi cha Tsh {$loan->amount}, wa {$names} umepitishwa na {$user->jina_kamili} wa simu namba {$user->mobile}.",
+                'description' => "Mkopo wa kiasi cha Tsh {$loan->amount}, wa {$names} umepitishwa na {$cheo} {$user->jina_kamili} wa simu namba {$user->mobile}.",
+            ]);
+
+            $ribaMkopo = $loan->amount * ($loan->riba/100);
+
+            // Create the transaction record
+            Transaction::create([
+                'type' => 'kuweka',
+                'category' => 'fomu',
+                'status' => 'completed',
+                'method' => 'cash',
+                'amount' => $ribaMkopo,
+                'description' => "Fomu ya tsh {$ribaMkopo} imekatwa kwenye mkopo wa {$names}",
+                'created_by' => $user->id,
+                'user_id' => $user->id,
+                'approved_by' => $user->id,
+                'ofisi_id' => $ofisi->id,
+                'loan_id' => $loan->id,
+                'customer_id' => null,
+            ]);
+
+            // Create the transaction record
+            Transaction::create([
+                'type' => 'kutoa',
+                'category' => 'mkopo',
+                'status' => 'completed',
+                'method' => 'cash',
+                'amount' => $loan->amount,
+                'description' => "Mkopo wa tsh {$ribaMkopo} umelipwa kwa {$names}",
+                'created_by' => $user->id,
+                'user_id' => $user->id,
+                'approved_by' => $user->id,
+                'ofisi_id' => $ofisi->id,
+                'loan_id' => $loan->id,
+                'customer_id' => null,
             ]);
 
             $this->sendNotification(
@@ -482,12 +541,23 @@ class LoanController extends Controller
                 throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
             }
 
-            // Retrieve the KikundiUser record to get the position and the Kikundi details
             $userOfisi = UserOfisi::where('user_id', $user->id)
                                 ->where('ofisi_id', $user->activeOfisi->ofisi_id)
                                 ->first();
 
             $ofisi = $userOfisi->ofisi;
+
+            $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
+
+            $position = $ofisi->pivot->position_id;
+
+            $positionRecord = Position::find($position);
+
+            if (!$positionRecord) {
+                throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+            }
+
+            $cheo = $positionRecord->name;
 
             $loan = Loan::findOrFail($request->loanId);
 
@@ -503,7 +573,7 @@ class LoanController extends Controller
                 'loan_id' => $loan->id,
                 'performed_by' => Auth::id(),
                 'action' => 'updated',
-                'description' => "Mkopo wa kiasi cha Tsh {$loan->amount}, wa {$names} umebatilishwa na kuwekewa kasoro ya {$request->error} na {$user->jina_kamili} wa simu namba {$user->mobile}.",
+                'description' => "Mkopo wa kiasi cha Tsh {$loan->amount}, wa {$names} umebatilishwa na kuwekewa kasoro ya {$request->error} na {$cheo} {$user->jina_kamili} wa simu namba {$user->mobile}.",
             ]);
 
             $this->sendNotification(
@@ -514,7 +584,7 @@ class LoanController extends Controller
             );
 
             $this->sendNotificationKwaViongoziWengine(
-                "Ombi la mkopo wa {$loan->loan_type} la kiasi cha Tsh {$loan->amount} la {$names} lina kasoro ya {$request->error}. limekataliwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Ombi la mkopo wa {$loan->loan_type} la kiasi cha Tsh {$loan->amount} la {$names} lina kasoro ya {$request->error}. limekataliwa na {$cheo} {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                 $ofisi->id,
                 $user->id
             );
