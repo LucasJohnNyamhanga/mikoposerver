@@ -19,6 +19,10 @@ return new class extends Migration
             $table->string('kata');
             $table->boolean('kujiunga_wapya')->default(true);
             $table->longText('maelezo')->nullable();
+            $table->enum('status', ['active','inactive','notpaid','closed'])->default('active');
+            $table->enum('ainaAcount', ['free', 'paid'])->default('free');
+            $table->dateTime('start_day')->default(now());
+            $table->dateTime('end_day')->default(now(7));
             $table->dateTime('last_seen')->nullable();
             $table->timestamps();
         });

@@ -420,6 +420,7 @@ class LoanController extends Controller
             ]);
 
             $ribaMkopo = $loan->amount * ($loan->riba/100);
+            $fomuMkopo = $loan->amount * ($loan->fomu/100);
 
             // Create the transaction record
             Transaction::create([
@@ -427,8 +428,8 @@ class LoanController extends Controller
                 'category' => 'fomu',
                 'status' => 'completed',
                 'method' => 'cash',
-                'amount' => $ribaMkopo,
-                'description' => "Fomu ya tsh {$ribaMkopo} imekatwa kwenye mkopo wa {$names}",
+                'amount' => $fomuMkopo,
+                'description' => "Makato Fomu ya tsh {$fomuMkopo} kwenye mkopo wa {$names}",
                 'created_by' => $user->id,
                 'user_id' => $user->id,
                 'approved_by' => $user->id,
