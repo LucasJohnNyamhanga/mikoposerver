@@ -45,6 +45,7 @@ class UploadController extends Controller
             return response()->json([
                 'message' => 'http://10.0.2.2:8000/uploads/mikopo/images/' . $new_name,
             ], 200);
+            //return response()->json(['message' => 'https://shulemtandao.com/uploads/microcredit/images/' . $new_name], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
