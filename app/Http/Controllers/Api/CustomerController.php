@@ -23,10 +23,12 @@ class CustomerController extends Controller
                 'jinaMaarufu' => 'required|string|max:15',
                 'jinsia' => 'required|string|max:255',
                 'anapoishi' => 'required|string', 
-                'simu' => 'required|string|max:255',
+                'simu' => 'required|string|max:255|unique:customers,simu',
                 'kazi' => 'required|string|max:255',
                 'picha' => 'required|string|max:255', 
                 'ofisiId' => 'required|integer',
+            ], [
+                'simu.unique' => 'Namba ya simu imeshatumika kwa mteja mwingine', // Custom message for username uniqueness
             ]);
 
             $appName = env('APP_NAME');
@@ -34,8 +36,9 @@ class CustomerController extends Controller
 
             // If validation fails, return a response with error messages
             if ($validator->fails()) {
-
-                throw new \Exception("Jaza maeneo yote yaliyowazi kuendelea.");
+                return response()->json([
+                    'message' => $validator->errors()->first()
+                ], 400);
             }
 
             $user = Auth::user();

@@ -128,17 +128,9 @@ class AuthController extends Controller
             'jinaMtumiaji.unique' => 'Jina la mtumiaji limeshatumika kwa mtumishi mwingine', // Custom message for username uniqueness
         ]);
 
-        // Return validation errors if they exist
         if ($validator->fails()) {
-            // Check if there are any validation error messages
-            $errorMessages = $validator->errors();
-
-            // If there are no specific messages, use the default message
-            $message = $errorMessages->isEmpty() ? 'Jaza maeneo yote yaliyowazi kuendelea' : $errorMessages;
-
             return response()->json([
-                'message' => $message,
-                'errors' => $errorMessages, // Return the validation errors for clarity
+                'message' => $validator->errors()->first()
             ], 400);
         }
 
@@ -179,15 +171,12 @@ class AuthController extends Controller
 
         // Return validation errors if they exist
         if ($validator->fails()) {
-            // Check if there are any validation error messages
-            $errorMessages = $validator->errors();
 
             // If there are no specific messages, use the default message
-            $message = $errorMessages->isEmpty() ? 'Jaza maeneo yote yaliyowazi kuendelea' : $errorMessages;
+            $message = 'Jaza maeneo yote yaliyowazi kuendelea';
 
             return response()->json([
                 'message' => $message,
-                'errors' => $errorMessages, // Return the validation errors for clarity
             ], 400);
         }
 

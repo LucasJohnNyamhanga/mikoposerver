@@ -75,4 +75,35 @@ class AinaController extends Controller
         return response()->json(['message' => 'Aina ya mkopo umetengenezwa'], 200);
 
     }
+
+    public function getAinaMakato(AinaRequest $request)
+    {
+
+        $user = Auth::user();
+
+        if (!$user) {
+            // Return error if user is not found
+            return response()->json(['message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'], 401);
+        }
+
+        // Check if the user has an active Kikundi
+        if ($user->activeOfisi) {
+            // Retrieve the KikundiUser record to get the position and the Kikundi details
+            $userOfisi = UserOfisi::where('user_id', $user->id)
+                                ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                                ->first();
+
+            $ofisi = $userOfisi->ofisi;
+            
+
+            $ainaMakato = Aina::where('id', $ofisi->id)
+                        ->get();
+            
+            return response()->json([
+            'makato' => $ainaMakato,
+            ], 200);
+        }
+
+        return response()->json(['message' => 'Huna usajili kwenye ofisi hii. Piga simu msaada 0784477999'], 401);
+    }
 }
