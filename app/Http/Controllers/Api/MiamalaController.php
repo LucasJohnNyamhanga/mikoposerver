@@ -146,6 +146,19 @@ class MiamalaController extends Controller
 
             $mteja = Customer::findOrFail($request->mtejaId);
 
+            // Check if any of the selected customers already have active loans
+            $loanExisting = DB::table('loan_customers')
+                ->join('loans', 'loan_customers.loan_id', '=', 'loans.id')
+                ->where('loan_customers.customer_id', $request->mtejaId)
+                ->whereIn('loans.status', ['pending', 'approved', 'defaulted'])
+                ->exists();
+
+            // Respond based on loan type
+            if (!$loanExisting) {
+                $message = 'Mteja hana mkopo wowote unaoendelea.';
+                throw new \Exception("{$message}");
+            }
+
             // Send notifications
             $this->sendNotification(
                 "Imethibitishwa faini ya Tsh {$request->amount} ya mteja {$mteja->jina} imepokelewa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",

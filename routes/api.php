@@ -33,6 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('getMikopoKasoro', [LoanController::class, 'getMikopoKasoro']);
     Route::post('lipiaRejesho', [MiamalaController::class, 'lipiaRejesho']);
     Route::post('lipiaFaini', [MiamalaController::class, 'lipiaFaini']);
+    Route::post('futaKato', [AinaController::class, 'futaKato']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

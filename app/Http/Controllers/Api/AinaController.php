@@ -9,6 +9,7 @@ use App\Models\Position;
 use App\Models\UserOfisi;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class AinaController extends Controller
 {
@@ -76,34 +77,72 @@ class AinaController extends Controller
 
     }
 
-    public function getAinaMakato(AinaRequest $request)
+    public function futaKato(AinaRequest $request)
     {
-
         $user = Auth::user();
+        $helpNumber = env('APP_HELP', '0784477999'); // fallback just in case
 
         if (!$user) {
-            // Return error if user is not found
-            return response()->json(['message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'], 401);
+            throw new HttpResponseException(response()->json([
+                'message' => "Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}"
+            ], 401));
         }
 
-        // Check if the user has an active Kikundi
-        if ($user->activeOfisi) {
-            // Retrieve the KikundiUser record to get the position and the Kikundi details
-            $userOfisi = UserOfisi::where('user_id', $user->id)
-                                ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-                                ->first();
+        if (!$user->activeOfisi) {
+            throw new HttpResponseException(response()->json([
+                'message' => "Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}"
+            ], 403));
+        }
 
-            $ofisi = $userOfisi->ofisi;
-            
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                            ->first();
 
-            $ainaMakato = Aina::where('id', $ofisi->id)
-                        ->get();
-            
+        if (!$userOfisi || !$userOfisi->ofisi) {
+            throw new HttpResponseException(response()->json([
+                'message' => "Hatukuweza kuthibitisha ushiriki wako kwenye ofisi hii."
+            ], 403));
+        }
+
+        $ofisiId = $userOfisi->ofisi->id;
+
+        $userOfisiPivot = $user->maofisi->where('id', $ofisiId)->first();
+
+        if (!$userOfisiPivot || !$userOfisiPivot->pivot) {
+            throw new HttpResponseException(response()->json([
+                'message' => "Hatukuweza kuthibitisha nafasi yako ya uongozi."
+            ], 403));
+        }
+
+        $positionId = $userOfisiPivot->pivot->position_id;
+        $positionRecord = Position::find($positionId);
+
+        if (!$positionRecord) {
+            throw new HttpResponseException(response()->json([
+                'message' => "Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo."
+            ], 403));
+        }
+
+        $validator = Validator::make($request->all(), [
+            'katoId' => 'required|integer',
+        ]);
+
+        if ($validator->fails()) {
             return response()->json([
-            'makato' => $ainaMakato,
-            ], 200);
+                'message' => 'Id ya kato imeshindwa kupatikana',
+                'errors' => $validator->errors()
+            ], 400);
         }
 
-        return response()->json(['message' => 'Huna usajili kwenye ofisi hii. Piga simu msaada 0784477999'], 401);
+        $kato = Aina::find($request->input('katoId'));
+
+        if (!$kato) {
+            return response()->json(['message' => 'Kato hilo halipo kwenye mfumo.'], 404);
+        }
+
+        $kato->delete();
+
+        return response()->json(['message' => 'Kato limefanikiwa kufutwa'], 200);
     }
+
 }
