@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,63 +11,86 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 
+/**
+ * App\Models\User
+ *
+ * @property int $id
+ * @property string $mobile
+ * @property string $jina_kamili
+ * @property string|null $jina_mdhamini
+ * @property string|null $simu_mdhamini
+ * @property string|null $picha
+ * @property string $username
+ * @property string $anakoishi
+ * @property bool $is_manager
+ * @property bool $is_admin
+ * @property bool $is_active
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ *
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Ofisi[] $maofisi
+ * @property-read \App\Models\Active|null $activeOfisi
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Position[] $positions
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Message[] $sentMessages
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Message[] $receivedMessages
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Customer[] $customer
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Loan[] $loans
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Transaction[] $transactions
+ */
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
-    public function maofisi():BelongsToMany
+    public function maofisi(): BelongsToMany
     {
         return $this->belongsToMany(Ofisi::class, 'user_ofisis')
                     ->withPivot('position_id', 'status')
                     ->withTimestamps();
     }
 
-    public function positions():HasManyThrough
+    public function ofisis()
+    {
+        return $this->belongsToMany(Ofisi::class, 'user_ofisis')
+            ->withPivot('status')
+            ->wherePivot('status', 'accepted')
+            ->withTimestamps();
+    }
+
+    public function positions(): HasManyThrough
     {
         return $this->hasManyThrough(Position::class, UserOfisi::class, 'user_id', 'id', 'id', 'position_id');
     }
 
-    public function activeOfisi():HasOne
+    public function activeOfisi(): HasOne
     {
         return $this->hasOne(Active::class);
-        // return instance of ative kikundi with kikundi name and other details
     }
 
-    public function sentMessages():HasMany
+    public function sentMessages(): HasMany
     {
         return $this->hasMany(Message::class, 'sender_id');
     }
 
-    public function receivedMessages():HasMany
+    public function receivedMessages(): HasMany
     {
         return $this->hasMany(Message::class, 'receiver_id');
     }
 
-    public function customer():HasMany
+    public function customer(): HasMany
     {
         return $this->hasMany(Customer::class);
     }
 
-    public function loans()
+    public function loans(): HasMany
     {
         return $this->hasMany(Loan::class);
     }
 
-    public function transactions()
+    public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
     }
 
-    
-
-
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'mobile',
         'jina_kamili',
@@ -83,28 +105,15 @@ class User extends Authenticatable
         'anakoishi',
     ];
 
-
-
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
-            // 'email_verified_at' => 'datetime',
-            // 'password' => 'hashed',
+            // add casting if needed
         ];
     }
 }

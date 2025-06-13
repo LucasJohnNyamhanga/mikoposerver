@@ -34,6 +34,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('lipiaRejesho', [MiamalaController::class, 'lipiaRejesho']);
     Route::post('lipiaFaini', [MiamalaController::class, 'lipiaFaini']);
     Route::post('futaKato', [AinaController::class, 'futaKato']);
+    Route::post('badiliUshirika', [OfisiController::class, 'badiliUshirika']);
+    Route::get('getUserOfisiSummary', [OfisiController::class, 'getUserOfisiSummary']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

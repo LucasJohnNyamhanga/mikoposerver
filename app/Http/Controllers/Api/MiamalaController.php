@@ -150,7 +150,7 @@ class MiamalaController extends Controller
             $loanExisting = DB::table('loan_customers')
                 ->join('loans', 'loan_customers.loan_id', '=', 'loans.id')
                 ->where('loan_customers.customer_id', $request->mtejaId)
-                ->whereIn('loans.status', ['pending', 'approved', 'defaulted'])
+                ->whereIn('loans.status', ['approved', 'defaulted'])
                 ->exists();
 
             // Respond based on loan type

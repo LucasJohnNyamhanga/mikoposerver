@@ -9,12 +9,16 @@ use App\Models\Loan;
 use App\Models\Mabadiliko;
 use App\Models\Message;
 use App\Models\Ofisi;
+use App\Models\Position;
 use App\Models\Transaction;
+use App\Models\User;
 use Carbon\Carbon;
 use App\Models\UserOfisi;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\JsonResponse;
 
 class OfisiController extends Controller
 {
@@ -92,6 +96,117 @@ class OfisiController extends Controller
         'ofisi' => $ofisiYangu,
         ], 200);
     }
+
+    public function getUserOfisiSummary(): JsonResponse
+    {
+        $userId = Auth::id(); // get current user ID
+
+        if (!$userId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $user = User::with(['ofisis' => function ($query) {
+            $query->withCount('customers')
+                ->withCount([
+                    'loans as active_loans_count' => function ($q) {
+                        $q->whereIn('status', ['approved', 'defaulted']);
+                    }
+                ])
+                ->withSum([
+                    'loans as total_amount_loaned' => function ($q) {
+                        $q->whereIn('status', ['approved', 'defaulted']);
+                    }
+                ], 'amount')
+                ->withSum([
+                    'loans as amount_defaulted' => function ($q) {
+                        $q->where('status', 'defaulted');
+                    }
+                ], 'amount');
+        }])->findOrFail($userId);
+
+        $ofisis = $user->ofisis->map(function ($ofisi) {
+            return [
+                'id' => $ofisi->id,
+                'jina' => $ofisi->jina,
+                'mkoa' => $ofisi->mkoa,
+                'wilaya' => $ofisi->wilaya,
+                'kata' => $ofisi->kata,
+                'customers_count' => $ofisi->customers_count,
+                'active_loans_count' => $ofisi->active_loans_count,
+                'total_amount_loaned' => (float) $ofisi->total_amount_loaned,
+                'amount_defaulted' => (float) $ofisi->amount_defaulted,
+            ];
+        });
+
+        return response()->json($ofisis);
+    }
+
+
+    public function badiliUshirika(OfisiRequest $request)
+    {
+        $user = Auth::user();
+        $helpNumber = env('APP_HELP');
+        $appName = env('APP_NAME');
+
+        if (!$user) {
+            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        }
+
+        if (!$user->activeOfisi) {
+            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        }
+
+        // Retrieve the KikundiUser record to get the position and the Kikundi details
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                            ->first();
+
+        $ofisi = $userOfisi->ofisi;
+
+        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
+
+        $position = $ofisi->pivot->position_id;
+
+        $positionRecord = Position::find($position);
+
+        if (!$positionRecord) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+        }
+
+        $cheo = $positionRecord->name;
+
+        // Validate input
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|boolean',
+            'userId' => 'required|integer|exists:users,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Taarifa za kubadili ushirika hazijawasilishwa ipasavyo',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        // Find target user's ofisi record
+        $targetUserOfisi = UserOfisi::where('user_id', $request->userId)
+                                    ->where('ofisi_id', $ofisi->id)
+                                    ->first();
+
+        if (!$targetUserOfisi) {
+            return response()->json([
+                'message' => 'Mtumiaji huyu hajajiunga na ofisi yako.',
+            ], 404);
+        }
+
+        $targetUserOfisi->status = $request->status ? 'accepted' : 'denied';
+        $targetUserOfisi->save();
+
+        return response()->json([
+            'message' => 'Mabadiliko ya ushirika yamefanikiwa',
+        ], 200);
+    }
+
 
     private function updateLoanStatuses($ofisiId)
     {
