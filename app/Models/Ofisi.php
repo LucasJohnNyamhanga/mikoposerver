@@ -19,6 +19,13 @@ class Ofisi extends Model
             // ->wherePivot('status', 'accepted'); // Filter where pivot status is denied
     }
 
+    public function acceptedUsers()
+    {
+        return $this->belongsToMany(User::class, 'user_ofisis')
+                    ->withPivot('status')
+                    ->wherePivot('status', 'accepted');
+    }
+
     public function positions():HasManyThrough
     {
         return $this->hasManyThrough(Position::class, UserOfisi::class, 'ofisi_id', 'id', 'id', 'position_id');

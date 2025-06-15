@@ -40,6 +40,18 @@ class AuthController extends Controller
             ], 400);
         }
 
+        $existingOfisi = Ofisi::where('jina', $request->jinaOfisi)
+            ->where('mkoa', $request->mkoa)
+            ->where('wilaya', $request->wilaya)
+            ->where('kata', $request->kata)
+            ->first();
+
+        if ($existingOfisi) {
+            return response()->json([
+                'message' => 'Jina la ofisi limeshatumika katika eneo hili',
+            ], 409);
+        }
+
         DB::beginTransaction();
         try {
             $user = User::create([
