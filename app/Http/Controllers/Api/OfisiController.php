@@ -434,7 +434,6 @@ class OfisiController extends Controller
 
         $ofisiId = $user->activeOfisi->ofisi_id;
 
-        // Get user's position in the active office
         $userOfisi = UserOfisi::where('user_id', $user->id)
                         ->where('ofisi_id', $ofisiId)
                         ->first();
@@ -445,7 +444,6 @@ class OfisiController extends Controller
             throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
         }
 
-        // Fetch all users in this ofisi with customers and loans
         $users = User::whereHas('maofisi', function ($query) use ($ofisiId) {
                 $query->where('ofisi_id', $ofisiId);
             })
@@ -466,11 +464,7 @@ class OfisiController extends Controller
             $positionId = $pivot?->position_id;
             $cheo = Position::find($positionId)?->name ?? 'Afisa';
 
-            // Calculate total active amount loaned
-            $totalActiveAmount = $u->loans->sum('amount');
-
             return [
-                // All user fields
                 'id' => $u->id,
                 'mobile' => $u->mobile,
                 'jina_kamili' => $u->jina_kamili,
@@ -485,10 +479,9 @@ class OfisiController extends Controller
                 'created_at' => $u->created_at?->toDateTimeString(),
                 'updated_at' => $u->updated_at?->toDateTimeString(),
 
-                // Extra metadata
                 'position' => $cheo,
+                'position_id' => $positionId,
 
-                // All customer fields
                 'customers' => $u->customer->map(function ($c) {
                     return [
                         'id' => $c->id,
@@ -501,12 +494,11 @@ class OfisiController extends Controller
                         'picha' => $c->picha,
                         'ofisi_id' => $c->ofisi_id,
                         'user_id' => $c->user_id,
-                        'created_at' => $c->created_at,  // Already string
-                        'updated_at' => $c->updated_at,  // Already string
+                        'created_at' => $c->created_at,
+                        'updated_at' => $c->updated_at,
                     ];
                 }),
 
-                // Active loans associated with user
                 'active_loans' => $u->loans->map(function ($loan) {
                     return [
                         'id' => $loan->id,
@@ -539,24 +531,20 @@ class OfisiController extends Controller
                                 'picha' => $c->picha,
                                 'ofisi_id' => $c->ofisi_id,
                                 'user_id' => $c->user_id,
-                                'created_at' => $c->created_at,  // Already string
-                                'updated_at' => $c->updated_at,  // Already string
+                                'created_at' => $c->created_at,
+                                'updated_at' => $c->updated_at,
                             ];
                         }),
                     ];
                 }),
-
-                // Total active loan amount
-                'total_active_loan_amount' => $totalActiveAmount,
             ];
         });
 
         return response()->json([
-            'success' => true,
-            'yourPosition' => $position->name,
             'users' => $data
         ]);
     }
+
 
 
 
