@@ -445,15 +445,16 @@ class OfisiController extends Controller
         }
 
         $users = User::whereHas('maofisi', function ($query) use ($ofisiId) {
-                $query->where('ofisi_id', $ofisiId);
-            })
+            $query->where('ofisi_id', $ofisiId)
+            ->where('user_ofisis.status', 'accepted');
+        })
             ->with([
                 'maofisi' => function ($query) use ($ofisiId) {
                     $query->where('ofisi_id', $ofisiId);
                 },
                 'customer',
                 'loans' => function ($query) {
-                    $query->whereIn('status', ['approved', 'waiting']);
+                    $query->whereIn('status', ['approved', 'defaulted']);
                 },
                 'loans.customers',
             ])
@@ -545,6 +546,68 @@ class OfisiController extends Controller
         ]);
     }
 
+    public function futaMtumishi(OfisiRequest $request)
+    {
+        $user = Auth::user();
+        $helpNumber = env('APP_HELP');
+
+        if (!$user) {
+            throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        }
+
+        $activeOfisi = $user->activeOfisi;
+
+        if (!$activeOfisi) {
+            throw new \Exception("Kuna tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        }
+
+        // Get user position in the current office
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+                            ->where('ofisi_id', $activeOfisi->ofisi_id)
+                            ->first();
+
+        if (!$userOfisi || !$userOfisi->ofisi) {
+            throw new \Exception("Hatukuweza kupata taarifa za ofisi yako kikamilifu.");
+        }
+
+        $positionRecord = Position::find($userOfisi->position_id);
+
+        if (!$positionRecord) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+        }
+
+        // Validate target user ID
+        $validator = Validator::make($request->all(), [
+            'userId' => 'required|integer|exists:users,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Taarifa za mtumiaji hazijawasilishwa ipasavyo.',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        // Find target user within the same office
+        $targetUserOfisi = UserOfisi::where('user_id', $request->userId)
+                                    ->where('ofisi_id', $userOfisi->ofisi_id)
+                                    ->first();
+
+        if (!$targetUserOfisi) {
+            return response()->json([
+                'message' => 'Mtumiaji huyu hajajiunga na ofisi yako.',
+            ], 404);
+        }
+
+        // Update pivot table status to 'denied'
+        $targetUserOfisi->position_id = null;
+        $targetUserOfisi->status = 'denied';
+        $targetUserOfisi->save();
+
+        return response()->json([
+            'message' => 'Mtumishi amefutwa kwa mafanikio kutoka ofisi yako.',
+        ], 200);
+    }
 
 
 
