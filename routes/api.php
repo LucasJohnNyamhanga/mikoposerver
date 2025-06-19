@@ -41,6 +41,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('jiungeOfisiBilaUser', [OfisiController::class, 'jiungeOfisiBilaUser']);
     Route::get('getOfisiUsersWithDetails', [OfisiController::class, 'getOfisiUsersWithDetails']);
     Route::post('futaMtumishi', [OfisiController::class, 'futaMtumishi']);
+    Route::post('badiliCheo', [OfisiController::class, 'badiliCheo']);
+    Route::post('registerMtumishi', [AuthController::class, 'registerMtumishi']);
+    Route::post('editMtumishi', [AuthController::class, 'editMtumishi']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

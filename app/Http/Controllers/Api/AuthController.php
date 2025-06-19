@@ -8,6 +8,7 @@ use App\Models\Message;
 use App\Models\Ofisi;
 use App\Models\Position;
 use App\Models\User;
+use App\Models\UserOfisi;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -294,6 +295,254 @@ class AuthController extends Controller
                 'message' => 'Hitilafu : ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function registerMtumishi(AuthRequest $request)
+    {
+        $user = Auth::user();
+        $helpNumber = env('APP_HELP');
+        $appName = env('APP_NAME');
+
+        if (!$user) {
+            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        }
+
+        if (!$user->activeOfisi) {
+            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        }
+
+        $ofisiId = $user->activeOfisi->ofisi_id;
+
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+                        ->where('ofisi_id', $ofisiId)
+                        ->first();
+
+        $position = Position::find($userOfisi?->position_id);
+
+        if (!$position) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona watumishi.");
+        }
+        // Validate the incoming request
+        $validator = Validator::make($request->all(), [
+            'jinaKamili' => 'required|string|max:255',
+            'simu' => 'required|string|max:15',
+            'makazi' => 'required|string|max:255',
+            'picha' => 'required|string', 
+            'jinaMdhamini' => 'required|string|max:255',
+            'simuMdhamini' => 'required|string|max:255',
+            'jinaMtumiaji' => 'required|string|max:255', 
+            'password' => 'required|string|max:255', 
+            'ofisiId' => 'required|integer',
+        ]);
+
+        // If validation fails, return a response with error messages
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Jaza maeneo yote yaliyowazi kuendelea'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $msajiliwa = User::create([
+                'jina_kamili' => $request->jinaKamili,
+                'mobile' => $request->simu,
+                'anakoishi' => $request->makazi,
+                'picha' => $request->picha,
+                'jina_mdhamini' => $request->jinaMdhamini,
+                'simu_mdhamini' => $request->simuMdhamini,
+                'username' => $request->jinaMtumiaji,
+                'password' => $request->password,
+            ]);
+
+
+            $ofisi = Ofisi::find($request->ofisiId);
+
+            if (!$ofisi) {
+                return response()->json([
+                    'message' => 'Ofisi yako ina changamoto kupatikana. Kwa msaada piga simu namba {$helpNumber}'
+                ], 400);
+            }
+
+            // Check if the relationship already exists
+            $exists = $msajiliwa->maofisi()->where('ofisi_id', $ofisi->id)->exists();
+
+            if ($exists) {
+                // Update the status in the pivot table
+                $msajiliwa->maofisi()->updateExistingPivot($ofisi->id, ['status' => 'accepted']);
+            } else {
+                // Attach if it doesn't exist
+                $msajiliwa->maofisi()->attach($ofisi->id, ['status' => 'accepted']);
+            }
+
+            DB::table('actives')->updateOrInsert(
+                ['user_id' => $msajiliwa->id], 
+                ['ofisi_id' => $ofisi->id, 'updated_at' => now(), 'created_at' => now()]
+            );
+
+            $this->sendNotification(
+                    "Hongera, umefanikiwa kufungua akaunti ya {$msajiliwa->jina_kamili}, kwa sasa jina la mtumiajia analotumia ni {$msajiliwa->username} na neno lake la siri ni {$msajiliwa->password}. Kwa msaada piga simu namba {$helpNumber}, Asante.",
+                    $user->id,
+                    null,
+                    $ofisi->id,
+                );
+
+            $this->sendNotification(
+                "Hongera, karibu kwenye mfumo wa {$appName}, akaunti yako imefunguliwa kikamilifu, kwa sasa jina la mtumiajia unalotumia ni {$msajiliwa->username} na neno lako la siri ni {$msajiliwa->password}. Kwa msaada piga simu namba {$helpNumber}, Asante.",
+                $msajiliwa->id,
+                null,
+                $ofisi->id,
+            );
+
+            DB::commit();
+
+            return response()->json(['message' => 'Akaunti imetengenezwa kikamilifu.'], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            $baseUrl = env('APP_URL');
+            $imagePath = $request->picha;
+            
+            $filePathImage = trim(str_replace($baseUrl, '', $imagePath));
+            $filePath = public_path($filePathImage);
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+            return response()->json([
+                'message' => 'Hitilafu : ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function editMtumishi(AuthRequest $request)
+    {
+        $user = Auth::user();
+        $helpNumber = env('APP_HELP');
+        $appName = env('APP_NAME');
+
+        if (!$user) {
+            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        }
+
+        if (!$user->activeOfisi) {
+            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        }
+
+        $ofisiId = $user->activeOfisi->ofisi_id;
+
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+                        ->where('ofisi_id', $ofisiId)
+                        ->first();
+
+        $position = Position::find($userOfisi?->position_id);
+
+        if (!$position) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona watumishi.");
+        }
+        // Validate the incoming request
+        $validator = Validator::make($request->all(), [
+            'mtumishiId' => 'required|exists:users,id',
+            'jinaKamili' => 'required|string|max:255',
+            'simu' => 'required|string|max:15',
+            'makazi' => 'required|string|max:255',
+            'picha' => 'required|string',
+            'jinaMdhamini' => 'required|string|max:255',
+            'simuMdhamini' => 'required|string|max:255',
+            'jinaMtumiaji' => 'required|string|max:255',
+            'password' => 'nullable|string|max:255', // make password optional
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Jaza maeneo yote yaliyowazi kuendelea'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $msajiliwa = User::findOrFail($request->mtumishiId);
+
+            // Backup old image path in case we need to delete
+            $oldImage = $msajiliwa->picha;
+
+            // Update user fields
+            $msajiliwa->jina_kamili = $request->jinaKamili;
+            $msajiliwa->mobile = $request->simu;
+            $msajiliwa->anakoishi = $request->makazi;
+            $msajiliwa->picha = $request->picha;
+            $msajiliwa->jina_mdhamini = $request->jinaMdhamini;
+            $msajiliwa->simu_mdhamini = $request->simuMdhamini;
+            $msajiliwa->username = $request->jinaMtumiaji;
+
+            if (!empty($request->password)) {
+                $msajiliwa->password = $request->password; // consider hashing here
+            }
+
+            $msajiliwa->save();
+
+            $ofisi = Ofisi::find($ofisiId);
+
+            // Sync or attach office if not linked yet
+            $exists = $msajiliwa->maofisi()->where('ofisi_id', $ofisi->id)->exists();
+            if ($exists) {
+                $msajiliwa->maofisi()->updateExistingPivot($ofisi->id, ['status' => 'accepted']);
+            } else {
+                $msajiliwa->maofisi()->attach($ofisi->id, ['status' => 'accepted']);
+            }
+
+            // Update or insert active office
+            DB::table('actives')->updateOrInsert(
+                ['user_id' => $msajiliwa->id],
+                ['ofisi_id' => $ofisi->id, 'updated_at' => now(), 'created_at' => now()]
+            );
+
+            // Send notifications
+            $this->sendNotification(
+                "Taarifa za mtumiaji {$msajiliwa->jina_kamili} zimehaririwa kikamilifu. Username ni {$msajiliwa->username}" .
+                (!empty($request->password) ? " na neno la siri ni {$request->password}." : ".") .
+                " Kwa msaada piga simu namba {$helpNumber}, Asante.",
+                $user->id,
+                null,
+                $ofisi->id,
+            );
+
+            $this->sendNotification(
+                "Taarifa zako zimeboreshwa kikamilifu. Username yako ni {$msajiliwa->username}" .
+                (!empty($request->password) ? " na neno lako la siri ni {$request->password}." : ".") .
+                " Kwa msaada piga simu namba {$helpNumber}, Asante.",
+                $msajiliwa->id,
+                null,
+                $ofisi->id,
+            );
+
+            // Delete old image if changed
+            if ($oldImage !== $request->picha) {
+                $baseUrl = env('APP_URL');
+                $oldPath = trim(str_replace($baseUrl, '', $oldImage));
+                $oldFilePath = public_path($oldPath);
+                if (file_exists($oldFilePath)) {
+                    unlink($oldFilePath);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json(['message' => 'Taarifa za mtumiaji zimeboreshwa kikamilifu.'], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            // Delete new image on failure
+            $baseUrl = env('APP_URL');
+            $imagePath = $request->picha;
+            $filePath = public_path(trim(str_replace($baseUrl, '', $imagePath)));
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+
+            return response()->json([
+                'message' => 'Hitilafu : ' . $e->getMessage()
+            ], 500);
+        }
+
     }
 
     public function login(AuthRequest $request)

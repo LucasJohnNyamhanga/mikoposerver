@@ -441,24 +441,30 @@ class OfisiController extends Controller
         $position = Position::find($userOfisi?->position_id);
 
         if (!$position) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona watumishi.");
         }
 
         $users = User::whereHas('maofisi', function ($query) use ($ofisiId) {
             $query->where('ofisi_id', $ofisiId)
-            ->where('user_ofisis.status', 'accepted');
+                  ->where('user_ofisis.status', 'accepted');
         })
-            ->with([
-                'maofisi' => function ($query) use ($ofisiId) {
-                    $query->where('ofisi_id', $ofisiId);
-                },
-                'customer',
-                'loans' => function ($query) {
-                    $query->whereIn('status', ['approved', 'defaulted']);
-                },
-                'loans.customers',
-            ])
-            ->get();
+        ->with([
+            'maofisi' => function ($query) use ($ofisiId) {
+                $query->where('ofisi_id', $ofisiId);
+            },
+            'customer' => function ($query) use ($ofisiId) {
+                $query->where('ofisi_id', $ofisiId);
+            },
+            'loans' => function ($query) use ($ofisiId) {
+                $query->whereIn('status', ['approved', 'defaulted'])
+                      ->where('ofisi_id', $ofisiId);
+            },
+            'loans.customers' => function ($query) use ($ofisiId) {
+                $query->where('ofisi_id', $ofisiId);
+            },
+        ])
+        ->get();
+    
 
         $data = $users->map(function ($u) {
             $pivot = $u->maofisi->first()?->pivot;
@@ -541,9 +547,12 @@ class OfisiController extends Controller
             ];
         });
 
+        $positions = Position::select('id', 'name')->get();
+
         return response()->json([
-            'users' => $data
-        ]);
+            'users' => $data,
+            'positions' => $positions,
+        ], 200);
     }
 
     public function futaMtumishi(OfisiRequest $request)
@@ -609,6 +618,68 @@ class OfisiController extends Controller
         ], 200);
     }
 
+    public function badiliCheo(OfisiRequest $request)
+    {
+        $user = Auth::user();
+        $helpNumber = env('APP_HELP');
+
+        if (!$user) {
+            throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        }
+
+        $activeOfisi = $user->activeOfisi;
+
+        if (!$activeOfisi) {
+            throw new \Exception("Kuna tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        }
+
+        $userOfisi = UserOfisi::where([
+            'user_id' => $user->id,
+            'ofisi_id' => $activeOfisi->ofisi_id,
+        ])->first();
+
+        if (!$userOfisi || !$userOfisi->ofisi) {
+            throw new \Exception("Hatukuweza kupata taarifa za ofisi yako kikamilifu.");
+        }
+
+        // Check if user has a valid position (is a leader)
+        if (!Position::find($userOfisi->position_id)) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+        }
+
+        // Validate incoming request
+        $validated = Validator::make($request->all(), [
+            'userId' => 'required|integer|exists:users,id',
+            'positionId' => 'required|integer',
+        ]);
+
+        if ($validated->fails()) {
+            return response()->json([
+                'message' => 'Taarifa za mtumiaji hazijawasilishwa ipasavyo.',
+                'errors' => $validated->errors(),
+            ], 400);
+        }
+
+        // Check if target user is in the same office
+        $targetUserOfisi = UserOfisi::where([
+            'user_id' => $request->userId,
+            'ofisi_id' => $userOfisi->ofisi_id,
+        ])->first();
+
+        if (!$targetUserOfisi) {
+            return response()->json([
+                'message' => 'Mtumiaji huyu hajajiunga na ofisi yako.',
+            ], 404);
+        }
+
+        // Update position (null if 0)
+        $targetUserOfisi->position_id = $request->positionId == 0 ? null : $request->positionId;
+        $targetUserOfisi->save();
+
+        return response()->json([
+            'message' => 'Mtumishi amebadilishiwa cheo kikamilifu.',
+        ], 200);
+    }
 
 
     private function updateLoanStatuses($ofisiId)
