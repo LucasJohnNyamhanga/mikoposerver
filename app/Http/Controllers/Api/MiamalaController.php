@@ -8,10 +8,14 @@ use App\Models\Customer;
 use App\Models\Loan;
 use App\Models\Message;
 use App\Models\Ofisi;
+use App\Models\Position;
 use App\Models\Transaction;
+use App\Models\UserOfisi;
+use Illuminate\Contracts\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule as ValidationRule;
 
 class MiamalaController extends Controller
 {
@@ -177,6 +181,119 @@ class MiamalaController extends Controller
 
             return response()->json([
                 'message' => 'Faini imepokelewa kikamilifu.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Faini imeshindikana kupokelewa.',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function sajiliPato(MiamalaRequest $request)
+    {
+        $user = Auth::user();
+        $helpNumber = env('APP_HELP');
+        $appName = env('APP_NAME');
+
+        if (!$user) {
+            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        }
+
+        if (!$user->activeOfisi) {
+            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        }
+
+        // Retrieve the KikundiUser record to get the position and the Kikundi details
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                            ->first();
+
+        $ofisi = $userOfisi->ofisi;
+
+        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
+
+        $position = $ofisi->pivot->position_id;
+
+        $positionRecord = Position::find($position);
+
+        if (!$positionRecord) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili pato.");
+        }
+
+        $cheo = $positionRecord->name;
+        // Validate input
+        $validator = Validator::make($request->all(), [
+            'type' => [
+                'required',
+                'string',
+                ValidationRule::in(['kuweka', 'kutoa']),
+            ],
+            'category' => [
+                'required',
+                'string',
+                ValidationRule::in(['fomu', 'rejesho', 'pato', 'tumizi', 'faini', 'mkopo']),
+            ],
+            'method' => [
+                'required',
+                'string',
+                ValidationRule::in(['benki', 'mpesa', 'halopesa', 'airtelmoney', 'mix by yas', 'pesa mkononi']),
+            ],
+            'amount' => [
+                'required',
+                'numeric',
+                'min:1',
+            ],
+            'description' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Create the transaction record
+            Transaction::create([
+                'type' => 'kuweka',
+                'category' => 'pato',
+                'status' => 'completed',
+                'method' => $request->method,
+                'amount' => $request->amount,
+                'description' => $request->description,
+                'created_by' => $user->id,
+                'user_id' => $user->id,
+                'approved_by' => $user->id,
+                'ofisi_id' => $ofisi->id,
+                'loan_id' => null,
+                'customer_id' => null,
+            ]);
+
+            // Send notifications
+            $this->sendNotification(
+                "Imethibitishwa pato la Tsh {$request->amount} limepokelewa kwa ajili ya {$request->description}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $user->id,
+                null,
+                $ofisi->id
+            );
+
+            $this->sendNotificationKwaViongoziWengine(
+                "Imethibitishwa pato la Tsh {$request->amount} limepokelewa kwa ajili ya {$request->description} na kuwekwa na {$cheo} {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $ofisi->id,
+                $user->id
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Pato limepokelewa kikamilifu.',
             ], 200);
 
         } catch (\Exception $e) {

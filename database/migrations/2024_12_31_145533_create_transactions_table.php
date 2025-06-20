@@ -14,9 +14,9 @@ return new class extends Migration
     Schema::create('transactions', function (Blueprint $table) {
         $table->id();
         $table->enum('type', ['kuweka', 'kutoa']);
-        $table->enum('category', ['fomu', 'rejesho','pato', 'tumizi', 'faini', 'mkopo','mtaji','gawio','yakutolea']);
+        $table->enum('category', ['fomu', 'rejesho','pato', 'tumizi', 'faini', 'mkopo',]);
         $table->enum('status', ['pending', 'completed', 'failed']);
-        $table->enum('method', ['benki', 'mpesa', 'halopesa','airtelmoney','mix by yas','cash'])->nullable();
+        $table->enum('method', ['benki', 'mpesa', 'halopesa','airtelmoney','mix by yas','pesa mkononi'])->nullable();
         $table->decimal('amount', 20, 2);
         $table->longText('description')->nullable();
 
