@@ -262,8 +262,8 @@ class MiamalaController extends Controller
         try {
             // Create the transaction record
             Transaction::create([
-                'type' => 'kuweka',
-                'category' => 'pato',
+                'type' => $request->type,
+                'category' => $request->category,
                 'status' => 'completed',
                 'method' => $request->method,
                 'amount' => $request->amount,
