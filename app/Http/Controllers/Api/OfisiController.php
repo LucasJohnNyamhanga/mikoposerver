@@ -331,7 +331,7 @@ class OfisiController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
-                'message' => 'Taarifa za kubadili ushirika hazijawasilishwa ipasavyo',
+                'message' => 'Taarifa za kubadili ofisi hazijawasilishwa ipasavyo',
                 'errors' => $validator->errors()
             ], 400);
         }
