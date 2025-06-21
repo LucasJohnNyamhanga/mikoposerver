@@ -311,17 +311,25 @@ class AuthController extends Controller
             throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
         }
 
-        $ofisiId = $user->activeOfisi->ofisi_id;
-
+        // Retrieve the KikundiUser record to get the position and the Kikundi details
         $userOfisi = UserOfisi::where('user_id', $user->id)
-                        ->where('ofisi_id', $ofisiId)
-                        ->first();
+                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                            ->first();
 
-        $position = Position::find($userOfisi?->position_id);
+        $ofisi = $userOfisi->ofisi;
 
-        if (!$position) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona watumishi.");
+        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
+
+        $position = $ofisi->pivot->position_id;
+
+        $positionRecord = Position::find($position);
+
+        if (!$positionRecord) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
         }
+
+        $cheo = $positionRecord->name;
+
         // Validate the incoming request
         $validator = Validator::make($request->all(), [
             'jinaKamili' => 'required|string|max:255',
@@ -381,14 +389,14 @@ class AuthController extends Controller
             );
 
             $this->sendNotification(
-                    "Hongera, umefanikiwa kufungua akaunti ya {$msajiliwa->jina_kamili}, kwa sasa jina la mtumiajia analotumia ni {$msajiliwa->username} na neno lake la siri ni {$msajiliwa->password}. Kwa msaada piga simu namba {$helpNumber}, Asante.",
+                    "Hongera, umefanikiwa kufungua akaunti ya {$msajiliwa->jina_kamili} mwenye simu namba {$msajiliwa->mobile},, kwa sasa jina la mtumiajia analotumia ni {$msajiliwa->username} na neno lake la siri ni {$msajiliwa->password}. Kwa msaada piga simu namba {$helpNumber}, Asante.",
                     $user->id,
                     null,
                     $ofisi->id,
                 );
 
             $this->sendNotification(
-                "Hongera, karibu kwenye mfumo wa {$appName}, akaunti yako imefunguliwa kikamilifu, kwa sasa jina la mtumiajia unalotumia ni {$msajiliwa->username} na neno lako la siri ni {$msajiliwa->password}. Kwa msaada piga simu namba {$helpNumber}, Asante.",
+                "Hongera, karibu kwenye mfumo wa {$appName}, akaunti yako imefunguliwa kikamilifu na {$cheo} {$user->jina_kamili} mwenye simu namba {$user->mobile}, kwa sasa jina la mtumiajia unalotumia ni {$msajiliwa->username} na neno lako la siri ni {$msajiliwa->password}. Kwa msaada piga simu namba {$helpNumber}, Asante.",
                 $msajiliwa->id,
                 null,
                 $ofisi->id,
