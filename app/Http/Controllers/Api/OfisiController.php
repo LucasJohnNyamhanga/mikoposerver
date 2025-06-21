@@ -148,6 +148,57 @@ class OfisiController extends Controller
         ], 200);
     }
 
+    public function getMatumizi(OfisiRequest $request)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'
+            ], 401);
+        }
+
+        if (!$user->activeOfisi) {
+            return response()->json([
+                'message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'
+            ], 401);
+        }
+
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+            ->first();
+
+        $ofisi = $userOfisi->ofisi;
+
+        $validator = Validator::make($request->all(), [
+            'startDate' => 'required|date',
+            'endDate'   => 'nullable|date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Taarifa za tarehe hazijawasilishwa ipasavyo',
+                'errors'  => $validator->errors()
+            ], 400);
+        }
+
+        $startDate = Carbon::parse($request->startDate)->startOfDay();
+        $endDate = $request->endDate
+            ? Carbon::parse($request->endDate)->endOfDay()
+            : $startDate->copy()->endOfDay();
+
+        $miamala = Transaction::with(['user', 'approver', 'creator', 'customer'])
+            ->where('ofisi_id', $ofisi->id)
+            ->where('type', 'kutoa') // Filter by type = kuweka (Mapato)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'matumizi' => $miamala,
+        ], 200);
+    }
+
 
     public function getUserOfisiSummary(): JsonResponse
     {

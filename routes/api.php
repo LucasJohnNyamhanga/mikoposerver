@@ -46,6 +46,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('editMtumishi', [AuthController::class, 'editMtumishi']);
     Route::post('sajiliPato', [MiamalaController::class, 'sajiliPato']);
     Route::post('getMapato', [OfisiController::class, 'getMapato']);
+    Route::post('getMatumizi', [OfisiController::class, 'getMatumizi']);
+    Route::post('sajiliTumizi', [MiamalaController::class, 'sajiliTumizi']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);
