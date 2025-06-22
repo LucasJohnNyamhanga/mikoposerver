@@ -15,10 +15,11 @@ return new class extends Migration
         $table->id();
         $table->enum('type', ['kuweka', 'kutoa']);
         $table->enum('category', ['fomu', 'rejesho','pato', 'tumizi', 'faini', 'mkopo',]);
-        $table->enum('status', ['pending', 'completed', 'failed']);
+        $table->enum('status', ['pending', 'completed', 'failed','cancelled']);
         $table->enum('method', ['benki', 'mpesa', 'halopesa','airtelmoney','mix by yas','pesa mkononi'])->nullable();
         $table->decimal('amount', 20, 2);
         $table->longText('description')->nullable();
+        $table->boolean('edited')->default(false);
 
         // Foreign keys
         $table->unsignedBigInteger('created_by');

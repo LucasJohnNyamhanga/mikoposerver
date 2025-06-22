@@ -58,6 +58,11 @@ class Ofisi extends Model
         return $this->hasMany(Transaction::class);
     }
 
+    public function transactionChanges(): HasMany
+    {
+        return $this->hasMany(TransactionChange::class);
+    }
+
     public function transactionsMwezi()
     {
         return $this->hasMany(Transaction::class)

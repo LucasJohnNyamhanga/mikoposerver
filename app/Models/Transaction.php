@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Transaction extends Model
 {
@@ -39,6 +40,33 @@ class Transaction extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    public function transactionChanges(): HasMany
+    {
+        return $this->hasMany(TransactionChange::class);
+    }
+
+    public function getAllTransaction($query)
+    {
+        return $query->with([
+            'user',
+            'approver',
+            'creator',
+            'customer',
+            'transactionChanges',
+        ]);
+    }
+
+    public static function getTransactionDetailsWithId($transactionId)
+    {
+        return self::with([
+            'user',
+            'approver',
+            'creator',
+            'customer',
+            'transactionChanges'
+        ])->findOrFail($transactionId);
+    }
+
     protected $fillable = [
         'type',
         'category',
@@ -52,5 +80,6 @@ class Transaction extends Model
         'ofisi_id',
         'loan_id',
         'customer_id',
+        'edited',
     ];
 }

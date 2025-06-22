@@ -63,7 +63,7 @@ class OfisiController extends Controller
 
         $ofisi = $userOfisi->ofisi;
 
-        $this->updateLoanStatuses($ofisi->id); //not being caled! why?
+        $this->updateLoanStatuses($ofisi->id);//its working
         
         $ofisiYangu = Ofisi::with(['users'=> function ($query) {
                 $query->with(['receivedMessages' => function ($query) {
@@ -79,7 +79,9 @@ class OfisiController extends Controller
                         $query->with(['customers','user','transactions'=> function ($query) {
                             $query->with([
                                 'user','approver','creator','customer'
-                            ])->latest();
+                            ])
+                            ->where('status', 'completed')
+                            ->latest();
                         }
                         ,'wadhamini','dhamana','mabadiliko'=> function ($query) {
                             $query->latest();
@@ -88,7 +90,9 @@ class OfisiController extends Controller
                     },'transactions'=> function ($query) {
                             $query->with([
                                 'user','approver','creator','customer'
-                            ])->whereDate('created_at', now()->toDateString()) ->latest();//get only today's transactions
+                            ])
+                            ->where('status', 'completed')
+                            ->whereDate('created_at', now()->toDateString()) ->latest();//transaction status must be 'completed'
                         },'ainamikopo'])->where('id', $ofisi->id)->first();
 
         return response()->json([
@@ -242,6 +246,53 @@ class OfisiController extends Controller
         });
 
         return response()->json($ofisis);
+    }
+
+    public function getMwamala(OfisiRequest $request)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'
+            ], 401);
+        }
+
+        if (!$user->activeOfisi) {
+            return response()->json([
+                'message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'
+            ], 401);
+        }
+
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+            ->first();
+
+        $ofisi = $userOfisi->ofisi; //use ofisi->id compare it to ofisi_id of transaction, reject if not the same ofisi
+
+        $validator = Validator::make($request->all(), [
+            'mwamalaId' => 'required|integer|exists:transactions,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Taarifa za mwamala hazijawasilishwa ipasavyo',
+                'errors'  => $validator->errors()
+            ], 400);
+        }
+
+        $transaction = Transaction::getTransactionDetailsWithId($request->mwamalaId);
+
+        // Check if transaction belongs to user's active ofisi
+        if ($transaction->ofisi_id !== $ofisi->id) {
+            return response()->json([
+                'message' => 'Huna ruhusa ya kuona taarifa za mwamala huu. Piga simu msaada 0784477999'
+            ], 403);
+        }
+
+        return response()->json([
+            'mwamala' => $transaction,
+        ], 200);
     }
 
 

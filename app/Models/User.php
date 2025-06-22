@@ -91,6 +91,11 @@ class User extends Authenticatable
         return $this->hasMany(Transaction::class);
     }
 
+    public function transactionChanges(): HasMany
+    {
+        return $this->hasMany(TransactionChange::class);
+    }
+
     protected $fillable = [
         'mobile',
         'jina_kamili',
