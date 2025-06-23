@@ -20,6 +20,7 @@ return new class extends Migration
             $table->decimal('amount', 20, 2);
             $table->longText('changes_details')->nullable();
             $table->longText('admin_details')->nullable();
+            $table->longText('reason')->nullable();
             $table->enum('action_type', ['edit', 'delete'])->default('edit');
             
             // Foreign keys

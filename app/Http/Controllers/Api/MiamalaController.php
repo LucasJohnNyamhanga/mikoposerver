@@ -418,6 +418,8 @@ class MiamalaController extends Controller
         }
     }
 
+    
+
 
     private function formatCustomerNames($customers)
     {

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\MiamalaController;
 use App\Http\Controllers\Api\OfisiController;
+use App\Http\Controllers\Api\TransactionChangeController;
 use App\Http\Controllers\Api\UploadController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -49,6 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('getMatumizi', [OfisiController::class, 'getMatumizi']);
     Route::post('sajiliTumizi', [MiamalaController::class, 'sajiliTumizi']);
     Route::post('getMwamala', [OfisiController::class, 'getMwamala']);
+    Route::post('haliliMwamala', [TransactionChangeController::class, 'haliliMwamala']);    
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);
