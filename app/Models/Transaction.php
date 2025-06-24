@@ -63,9 +63,14 @@ class Transaction extends Model
             'approver',
             'creator',
             'customer',
-            'transactionChanges'
+            'transactionChanges' => function ($query) {
+                $query->with([
+                    'user', 'approver', 'creator'
+                ])->latest();
+            }
         ])->findOrFail($transactionId);
     }
+
 
     protected $fillable = [
         'type',

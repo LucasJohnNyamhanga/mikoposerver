@@ -92,7 +92,7 @@ class OfisiController extends Controller
                                 'user','approver','creator','customer'
                             ])
                             ->where('status', 'completed')
-                            ->whereDate('created_at', now()->toDateString()) ->latest();//transaction status must be 'completed'
+                            ->whereDate('created_at', now()->toDateString())->latest();//transaction status must be 'completed'
                         },'ainamikopo'])->where('id', $ofisi->id)->first();
 
         return response()->json([

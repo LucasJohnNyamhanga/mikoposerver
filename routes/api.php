@@ -50,7 +50,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('getMatumizi', [OfisiController::class, 'getMatumizi']);
     Route::post('sajiliTumizi', [MiamalaController::class, 'sajiliTumizi']);
     Route::post('getMwamala', [OfisiController::class, 'getMwamala']);
-    Route::post('haliliMwamala', [TransactionChangeController::class, 'haliliMwamala']);    
+    Route::post('haliliMwamala', [TransactionChangeController::class, 'haliliMwamala']);
+    Route::post('kubaliMwamala', [TransactionChangeController::class, 'kubaliMwamala']);
+    Route::post('kataaMwamala', [TransactionChangeController::class, 'kataaMwamala']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

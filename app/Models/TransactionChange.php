@@ -40,7 +40,7 @@ class TransactionChange extends Model
         'status',
         'method',
         'amount',
-        'changes_details',
+        'description',
         'admin_details',
         'action_type',
         'created_by',
@@ -48,5 +48,6 @@ class TransactionChange extends Model
         'user_id',
         'ofisi_id',
         'transaction_id',
+        'reason',
     ];
 }

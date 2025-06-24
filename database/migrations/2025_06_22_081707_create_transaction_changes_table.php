@@ -18,7 +18,7 @@ return new class extends Migration
             $table->enum('status', ['pending', 'completed', 'failed','cancelled']);
             $table->enum('method', ['benki', 'mpesa', 'halopesa','airtelmoney','mix by yas','pesa mkononi'])->nullable();
             $table->decimal('amount', 20, 2);
-            $table->longText('changes_details')->nullable();
+            $table->longText('description')->nullable();
             $table->longText('admin_details')->nullable();
             $table->longText('reason')->nullable();
             $table->enum('action_type', ['edit', 'delete'])->default('edit');
