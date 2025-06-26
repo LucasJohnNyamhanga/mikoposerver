@@ -362,6 +362,107 @@ class TransactionChangeController extends Controller
             ], 500);
         }
     }
+
+    public function futaMwamala(MiamalaRequest $request)
+    {
+        $user = Auth::user();
+        $helpNumber = env('APP_HELP');
+        $appName = env('APP_NAME');
+
+        if (!$user) {
+            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        }
+
+        if (!$user->activeOfisi) {
+            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        }
+
+        // Retrieve the KikundiUser record to get the position and the Kikundi details
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                            ->first();
+
+        $ofisi = $userOfisi->ofisi;
+
+        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
+
+        $position = $ofisi->pivot->position_id;
+
+        $positionRecord = Position::find($position);
+
+        if (!$positionRecord) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili tumizi.");
+        }
+
+        $cheo = $positionRecord->name;
+        // Validate input
+        $validator = Validator::make($request->all(), [
+            'mwamalaId' => 'required|integer|exists:transactions,id', 
+            'reason' => 'required|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'errors'  => $validator->errors()
+            ], 400);
+        }
+
+        $transaction = Transaction::find($request->mwamalaId);
+
+        if ($transaction->ofisi_id != $ofisi->id) {
+            throw new \Exception("Huna ruhusa ya kuhalili mwamala huu.");
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Create the transaction record
+            $transactionChange = TransactionChange::create([
+                'type' => null,
+                'category' => null,
+                'status' => 'pending',
+                'method' => null,
+                'amount' => null,
+                'description' => null,
+                'created_by' => $user->id,
+                'user_id' => $user->id,
+                'approved_by' => $user->id,
+                'ofisi_id' => $ofisi->id,
+                'admin_details' => null,
+                'action_type' => 'delete',
+                'transaction_id' => $transaction->id,
+                'reason' => $request->reason,
+            ]);
+
+            // Send notifications
+            $this->sendNotification(
+                "Ombi la kufuta mwamala wa Tsh {$transaction->amount} wa {$transaction->category} kwenda Tsh {$transactionChange->amount} limepokelewa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $user->id,
+                null,
+                $ofisi->id
+            );
+
+            $this->sendNotificationKwaViongoziWengine(
+                "Ombi la kufuta mwamala wa Tsh {$transaction->amount} wa {$transaction->category} kwenda Tsh {$transactionChange->amount} limewasilishwa na {$cheo} {$user->jina_kamili} mwenye namba {$user->mobile}. Unaweza kulifanyia mabadiliko kupitia menu kuu -> Usimamizi -> Marekebisho Miamala. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $ofisi->id,
+                $user->id
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Ombi la kufuta limesajiliwa kikamilifu.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Ombi limeshindikana kupokelewa. Jaribu tena baadaye.',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
     
     private function formatCustomerNames($customers)
     {

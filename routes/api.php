@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('haliliMwamala', [TransactionChangeController::class, 'haliliMwamala']);
     Route::post('kubaliMwamala', [TransactionChangeController::class, 'kubaliMwamala']);
     Route::post('kataaMwamala', [TransactionChangeController::class, 'kataaMwamala']);
+    Route::post('futaMwamala', [TransactionChangeController::class, 'futaMwamala']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

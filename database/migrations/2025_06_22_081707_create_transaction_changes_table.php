@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::create('transaction_changes', function (Blueprint $table) {
             $table->id();
-            $table->enum('type', ['kuweka', 'kutoa']);
-            $table->enum('category', ['fomu', 'rejesho','pato', 'tumizi', 'faini', 'mkopo',]);
+            $table->enum('type', ['kuweka', 'kutoa'])->nullable();
+            $table->enum('category', ['fomu', 'rejesho','pato', 'tumizi', 'faini', 'mkopo',])->nullable();
             $table->enum('status', ['pending', 'completed', 'failed','cancelled']);
             $table->enum('method', ['benki', 'mpesa', 'halopesa','airtelmoney','mix by yas','pesa mkononi'])->nullable();
-            $table->decimal('amount', 20, 2);
+            $table->decimal('amount', 20, 2)->nullable();
             $table->longText('description')->nullable();
             $table->longText('admin_details')->nullable();
             $table->longText('reason')->nullable();
