@@ -463,6 +463,216 @@ class TransactionChangeController extends Controller
             ], 500);
         }
     }
+
+    public function kubaliKufutaMwamala(MiamalaRequest $request)
+    {
+        $user = Auth::user();
+        $helpNumber = env('APP_HELP');
+        $appName = env('APP_NAME');
+
+        if (!$user) {
+            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        }
+
+        $activeOfisi = $user->activeOfisi;
+        if (!$activeOfisi) {
+            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        }
+
+        // Get user position in the office
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+            ->where('ofisi_id', $activeOfisi->ofisi_id)
+            ->first();
+
+        if (!$userOfisi) {
+            throw new \Exception("Hujasajiliwa katika ofisi hii.");
+        }
+
+        $ofisi = $userOfisi->ofisi;
+        $pivot = $user->maofisi->where('id', $ofisi->id)->first()?->pivot;
+
+        if (!$pivot || !$pivot->position_id) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili tumizi.");
+        }
+
+        $positionRecord = Position::find($pivot->position_id);
+        if (!$positionRecord) {
+            throw new \Exception("Cheo chako hakijafafanuliwa vizuri.");
+        }
+
+        $cheo = $positionRecord->name;
+
+        // Validate request input
+        $validator = Validator::make($request->all(), [
+            'mwamalaChangeId' => 'required|integer|exists:transaction_changes,id',
+            'adminDetails' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Taarifa za mwamala hazijawasilishwa ipasavyo',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        $transactionChange = TransactionChange::find($request->mwamalaChangeId);
+        $transaction = Transaction::find($transactionChange->transaction_id);//copy of this transaction should be backedup before update and then being saved to the transaction change table
+
+        if (!$transaction) {
+            throw new \Exception("Mwamala unaotakiwa kubadilishwa, haujapatikana.");
+        }
+
+        if ($transaction->ofisi_id != $ofisi->id) {
+            throw new \Exception("Huna ruhusa ya kuhalili mwamala huu.");
+        }
+
+        DB::beginTransaction();
+
+        try {
+
+            // Update the transaction with the new values
+            $transaction->update([
+                'status' => 'cancelled',
+                'edited' => true,
+            ]);
+
+            $transactionChange->update([
+                'status' => 'completed',
+                'approved_by' => $user->id,
+                'admin_details' => $request->adminDetails,
+            ]);
+
+            // Notify the user
+            $this->sendNotification(
+                "Ombi la kufuta mwamala wa Tsh {$transaction->amount} wa {$transaction->category} limekubaliwa na {$cheo} {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $transactionChange->user_id,
+                null,
+                $ofisi->id
+            );
+
+            // Notify other leaders
+            $this->sendNotificationKwaViongoziWengine(
+                "Ombi la kufuta mwamala wa Tsh {$transaction->amount} wa {$transaction->category} limekamilika na kufutwa kikamilifu na {$cheo} {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $ofisi->id,
+                $user->id
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Ombi la kuhalili limekamilishwa kikamilifu.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Ombi limeshindikana kupokelewa. Jaribu tena baadaye.',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function kataaFutaMwamala(MiamalaRequest $request)
+    {
+        $user = Auth::user();
+        $helpNumber = env('APP_HELP');
+        $appName = env('APP_NAME');
+
+        if (!$user) {
+            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        }
+
+        $activeOfisi = $user->activeOfisi;
+        if (!$activeOfisi) {
+            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        }
+
+        // Get user position in the office
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+            ->where('ofisi_id', $activeOfisi->ofisi_id)
+            ->first();
+
+        if (!$userOfisi) {
+            throw new \Exception("Hujasajiliwa katika ofisi hii.");
+        }
+
+        $ofisi = $userOfisi->ofisi;
+        $pivot = $user->maofisi->where('id', $ofisi->id)->first()?->pivot;
+
+        if (!$pivot || !$pivot->position_id) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili tumizi.");
+        }
+
+        $positionRecord = Position::find($pivot->position_id);
+        if (!$positionRecord) {
+            throw new \Exception("Cheo chako hakijafafanuliwa vizuri.");
+        }
+
+        $cheo = $positionRecord->name;
+
+        // Validate request input
+        $validator = Validator::make($request->all(), [
+            'mwamalaChangeId' => 'required|integer|exists:transaction_changes,id',
+            'adminDetails' => 'required|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Taarifa za mwamala hazijawasilishwa ipasavyo',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        $transactionChange = TransactionChange::find($request->mwamalaChangeId);
+        $transaction = Transaction::find($transactionChange->transaction_id);
+
+        if (!$transaction) {
+            throw new \Exception("Mwamala unaotakiwa kubadilishwa, haujapatikana.");
+        }
+
+        if ($transaction->ofisi_id != $ofisi->id) {
+            throw new \Exception("Huna ruhusa ya kuhalili mwamala huu.");
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Save the old values into the transaction_change record
+            $transactionChange->update([
+                'status' => 'failed',
+                'approved_by' => $user->id,
+                'admin_details' => $request->adminDetails,
+            ]);
+
+            // Notify the user
+            $this->sendNotification(
+                "Ombi la kufuta mwamala wa Tsh {$transaction->amount} wa {$transaction->category} limekataliwa na  {$cheo} {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $transactionChange->user_id,
+                null,
+                $ofisi->id
+            );
+
+            // Notify other leaders
+            $this->sendNotificationKwaViongoziWengine(
+                "Ombi la kufuta mwamala wa Tsh {$transaction->amount} wa {$transaction->category} limekataliwa na {$cheo} {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $ofisi->id,
+                $user->id
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Ombi la kuhalili limekataliwa kikamilifu.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Ombi limeshindikana kupokelewa. Jaribu tena baadaye.',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
     
     private function formatCustomerNames($customers)
     {

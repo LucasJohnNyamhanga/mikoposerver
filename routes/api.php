@@ -54,6 +54,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('kubaliMwamala', [TransactionChangeController::class, 'kubaliMwamala']);
     Route::post('kataaMwamala', [TransactionChangeController::class, 'kataaMwamala']);
     Route::post('futaMwamala', [TransactionChangeController::class, 'futaMwamala']);
+    Route::post('futaMwamala', [TransactionChangeController::class, 'futaMwamala']);
+    Route::post('kubaliKufutaMwamala', [TransactionChangeController::class, 'kubaliKufutaMwamala']);
+    Route::post('kataaFutaMwamala', [TransactionChangeController::class, 'kataaFutaMwamala']);
+    Route::get('getMarekebishoMiamala', [MiamalaController::class, 'getMarekebishoMiamala']);
+    Route::get('getMiamalaByDay', [MiamalaController::class, 'getMiamalaByDay']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

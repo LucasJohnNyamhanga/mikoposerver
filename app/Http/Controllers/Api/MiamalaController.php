@@ -418,7 +418,105 @@ class MiamalaController extends Controller
         }
     }
 
-    
+    public function getMarekebishoMiamala(MiamalaRequest $request)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'
+            ], 401);
+        }
+
+        if (!$user->activeOfisi) {
+            return response()->json([
+                'message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'
+            ], 401);
+        }
+
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+            ->first();
+
+        $ofisi = $userOfisi->ofisi;
+
+        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
+
+        $position = $ofisi->pivot->position_id;
+
+        $positionRecord = Position::find($position);
+
+        if (!$positionRecord) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.");
+        }
+
+        $miamala = Transaction::with(['user', 'approver', 'creator', 'customer', 'transactionChanges'])
+            ->where('ofisi_id', $ofisi->id)
+            ->where('status', 'completed')
+            ->whereHas('transactionChanges', function ($query) {
+                $query->where('status', 'pending');
+            })
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'miamala' => $miamala,
+        ], 200);
+    }
+
+    public function getMiamalaByDay(MiamalaRequest $request)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'
+            ], 401);
+        }
+
+        if (!$user->activeOfisi) {
+            return response()->json([
+                'message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'
+            ], 401);
+        }
+
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+            ->first();
+
+        $ofisi = $userOfisi->ofisi;
+
+        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
+
+        $position = $ofisi->pivot->position_id;
+
+        $positionRecord = Position::find($position);
+
+        if (!$positionRecord) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.");
+        }
+
+        $openBalance = Transaction::where('ofisi_id', $ofisi->id)
+            ->where('status', 'completed')
+            ->whereDate('created_at', '<', now()->toDateString())
+            ->get()
+            ->reduce(function ($carry, $item) {
+                return $carry + ($item->type === 'kuweka' ? $item->amount : -$item->amount);
+            }, 0);
+
+
+        $miamala = Transaction::with(['user', 'approver', 'creator', 'customer', 'transactionChanges'])
+            ->where('ofisi_id', $ofisi->id)
+            ->where('status', 'completed')
+            ->whereDate('created_at', now()->toDateString())
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'miamala' => $miamala,
+            'openBalance' => $openBalance,
+        ], 200);
+    }
 
 
     private function formatCustomerNames($customers)

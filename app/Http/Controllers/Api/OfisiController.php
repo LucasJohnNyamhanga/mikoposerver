@@ -92,7 +92,7 @@ class OfisiController extends Controller
                                 'user','approver','creator','customer'
                             ])
                             ->where('status', 'completed')
-                            ->whereDate('created_at', now()->toDateString())->latest();//transaction status must be 'completed'
+                            ->whereDate('created_at', now()->toDateString())->latest();
                         },'ainamikopo'])->where('id', $ofisi->id)->first();
 
         return response()->json([
@@ -143,6 +143,7 @@ class OfisiController extends Controller
         $miamala = Transaction::with(['user', 'approver', 'creator', 'customer'])
             ->where('ofisi_id', $ofisi->id)
             ->where('type', 'kuweka') // Filter by type = kuweka (Mapato)
+            ->where('status', 'completed')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->latest()
             ->get();
@@ -193,7 +194,8 @@ class OfisiController extends Controller
 
         $miamala = Transaction::with(['user', 'approver', 'creator', 'customer'])
             ->where('ofisi_id', $ofisi->id)
-            ->where('type', 'kutoa') // Filter by type = kuweka (Mapato)
+            ->where('type', 'kutoa') // Filter by type = kutoa (Matumizi)
+            ->where('status', 'completed')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->latest()
             ->get();
