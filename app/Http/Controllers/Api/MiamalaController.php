@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule as ValidationRule;
+use App\Services\LoanService;
 
 class MiamalaController extends Controller
 {
@@ -464,7 +465,7 @@ class MiamalaController extends Controller
         ], 200);
     }
 
-    public function getMiamalaByDay(MiamalaRequest $request)
+    public function getMiamalaByDay(MiamalaRequest $request, LoanService $loanService)
     {
         $user = Auth::user();
 
@@ -512,9 +513,18 @@ class MiamalaController extends Controller
             ->latest()
             ->get();
 
+        $mikopoRejesho = $loanService->getLoansWithPendingRejesho();
+
+        $countMikopoNjeMuda = $loanService->countDefaultedLoans();
+
+        $profit = $loanService->getProfitFromActiveLoans();
+
         return response()->json([
             'miamala' => $miamala,
             'openBalance' => $openBalance,
+            'mikopoRejeshoDeni' => $mikopoRejesho,
+            'countMikopoNjeMuda' => $countMikopoNjeMuda,
+            'faidaMikopoHai' => $profit,
         ], 200);
     }
 
