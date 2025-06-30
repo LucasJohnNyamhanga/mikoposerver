@@ -11,7 +11,7 @@ use App\Models\Ofisi;
 use App\Models\Position;
 use App\Models\Transaction;
 use App\Models\UserOfisi;
-use Illuminate\Contracts\Validation\Rule;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -527,6 +527,74 @@ class MiamalaController extends Controller
             'faidaMikopoHai' => $profit,
         ], 200);
     }
+
+    public function getMiamalaByDates(MiamalaRequest $request, LoanService $loanService)
+    {
+        $user = Auth::user();
+
+        abort_if(!$user, 401, 'Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga msaada 0784477999');
+
+        $activeOfisi = $user->activeOfisi;
+        abort_if(!$activeOfisi, 401, 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999');
+
+        $userOfisi = UserOfisi::where([
+            'user_id' => $user->id,
+            'ofisi_id' => $activeOfisi->ofisi_id
+        ])->first();
+
+        $ofisi = $user->maofisi->firstWhere('id', $userOfisi->ofisi_id);
+        $positionId = optional($ofisi->pivot)->position_id;
+        $positionRecord = Position::find($positionId);
+
+        abort_unless($positionRecord, 403, 'Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.');
+
+        $validator = Validator::make($request->all(), [
+            'startDate' => 'required|date',
+            'endDate'   => 'nullable|date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Taarifa za tarehe hazijawasilishwa ipasavyo',
+                'errors'  => $validator->errors()
+            ], 400);
+        }
+
+        $startDate = Carbon::parse($request->startDate)->startOfDay();
+        $endDate = $request->endDate
+            ? Carbon::parse($request->endDate)->endOfDay()
+            : $startDate->copy()->endOfDay();
+
+        // Opening balance before the start date
+        $openBalance = Transaction::where('ofisi_id', $ofisi->id)
+            ->where('status', 'completed')
+            ->whereDate('created_at', '<', $startDate)
+            ->get()
+            ->sum(function ($tx) {
+                return $tx->type === 'kuweka' ? $tx->amount : -$tx->amount;
+            });
+
+        // Transactions within date range
+        $miamala = Transaction::with(['user', 'approver', 'creator', 'customer', 'transactionChanges'])
+            ->where('ofisi_id', $ofisi->id)
+            ->where('status', 'completed')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->latest()
+            ->get();
+
+        $mikopoRejesho = $loanService->getLoansWithPendingRejeshoUntilDate($endDate);
+        $countMikopoNjeMuda = $loanService->countDefaultedLoansUntilDate($endDate);
+        $profit = $loanService->getProfitFromActiveLoansUntilDate($endDate);
+
+        return response()->json([
+            'miamala' => $miamala,
+            'openBalance' => $openBalance,
+            'mikopoRejeshoDeni' => $mikopoRejesho,
+            'countMikopoNjeMuda' => $countMikopoNjeMuda,
+            'faidaMikopoHai' => $profit,
+        ]);
+    }
+
 
 
     private function formatCustomerNames($customers)

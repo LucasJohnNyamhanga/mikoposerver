@@ -427,7 +427,7 @@ class LoanController extends Controller
                 'type' => 'kuweka',
                 'category' => 'fomu',
                 'status' => 'completed',
-                'method' => 'cash',
+                'method' => 'pesa mkononi',
                 'amount' => $fomuMkopo,
                 'description' => "Makato Fomu ya tsh {$fomuMkopo} kwenye mkopo wa {$names}",
                 'created_by' => $user->id,
@@ -443,7 +443,7 @@ class LoanController extends Controller
                 'type' => 'kutoa',
                 'category' => 'mkopo',
                 'status' => 'completed',
-                'method' => 'cash',
+                'method' => 'pesa mkononi',
                 'amount' => $loan->amount,
                 'description' => "Mkopo wa tsh {$ribaMkopo} umelipwa kwa {$names}",
                 'created_by' => $user->id,
@@ -455,14 +455,14 @@ class LoanController extends Controller
             ]);
 
             $this->sendNotification(
-                "Mkopo wa Tsh {$loan->amount} wa {$names} umepitishwa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Mkopo wa Tsh {$loan->amount} wa {$names} umepitishwa na {$cheo} {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                 $user->id,
                 null,
                 $ofisi->id
             );
 
             $this->sendNotificationKwaViongoziWengine(
-                "Ombi la mkopo la kiasi cha Tsh {$loan->amount} la {$names} limepitishwa. Limepitishwa na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Ombi la mkopo la kiasi cha Tsh {$loan->amount} la {$names} limepitishwa. Limepitishwa na {$cheo} {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                 $ofisi->id,
                 $user->id
             );
