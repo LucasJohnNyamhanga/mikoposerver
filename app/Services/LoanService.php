@@ -6,6 +6,7 @@ use App\Models\Loan;
 use DateTime;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Carbon\Carbon;
 
 class LoanService
 {
@@ -75,13 +76,14 @@ class LoanService
     public function getLoansWithPendingRejesho(): array
     {
         $results = [];
-        $today = new DateTime(); // today's date as the cutoff
-    
+        $endDate = Carbon::parse(new DateTime())->endOfDay(); // today's date as the cutoff
+
         $loans = Loan::with(['transactions', 'customers'])
             ->whereIn('status', ['approved', 'defaulted'])
             ->get();
-    
+
         foreach ($loans as $loan) {
+            // Skip invalid loans
             if (
                 !$loan->issued_date ||
                 !$loan->amount ||
@@ -92,27 +94,30 @@ class LoanService
             ) {
                 continue;
             }
-    
+
             $issuedDate = new DateTime($loan->issued_date);
             $installmentAmount = $loan->total_due / $loan->muda_malipo;
-    
-            // Generate due dates for each installment
+
+            // Generate due dates
             $dueDates = $this->generateInstallmentDueDates($issuedDate, $loan->muda_malipo, $loan->kipindi_malipo);
-    
-            // Only count installments due after the issued date, and before or on today
+
+            // Count how many installments should have been paid by endDate
             $expectedInstallments = collect($dueDates)
-                ->filter(fn($dueDate) => $dueDate > $issuedDate && $dueDate <= $today)
-                ->count();
-    
+            ->filter(fn($dueDate) => $dueDate > $issuedDate && $dueDate <= $endDate)
+            ->count();
+
             $expected = $expectedInstallments * $installmentAmount;
-    
-            // Sum of actual payments (up to today)
+
+            // Sum of payments made up to endDate
             $paid = $loan->transactions
                 ->where('type', 'kuweka')
                 ->where('category', 'rejesho')
-                ->filter(fn($tx) => new DateTime($tx->created_at) <= $today)
+                ->filter(function ($tx) use ($endDate) {
+                    $date = new DateTime($tx->created_at);
+                    return $date <= $endDate;
+                })
                 ->sum('amount');
-    
+
             if ($expected > $paid) {
                 $results[] = [
                     'loan_id' => $loan->id,
@@ -140,8 +145,9 @@ class LoanService
                 ];
             }
         }
-    
+
         return $results;
+    
     }
     
 

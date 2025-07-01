@@ -20,6 +20,7 @@ return new class extends Migration
         $table->decimal('amount', 20, 2);
         $table->longText('description')->nullable();
         $table->boolean('edited')->default(false);
+        $table->boolean('is_loan_source')->default(false);
 
         // Foreign keys
         $table->unsignedBigInteger('created_by');

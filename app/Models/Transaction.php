@@ -86,5 +86,6 @@ class Transaction extends Model
         'loan_id',
         'customer_id',
         'edited',
+        'is_loan_source',
     ];
 }

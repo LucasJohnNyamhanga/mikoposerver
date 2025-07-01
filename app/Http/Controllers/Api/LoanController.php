@@ -436,6 +436,7 @@ class LoanController extends Controller
                 'ofisi_id' => $ofisi->id,
                 'loan_id' => $loan->id,
                 'customer_id' => null,
+                'is_loan_source' => true,
             ]);
 
             // Create the transaction record
@@ -445,13 +446,14 @@ class LoanController extends Controller
                 'status' => 'completed',
                 'method' => 'pesa mkononi',
                 'amount' => $loan->amount,
-                'description' => "Mkopo wa tsh {$ribaMkopo} umelipwa kwa {$names}",
+                'description' => "Mkopo umelipwa kwa {$names}",
                 'created_by' => $user->id,
                 'user_id' => $user->id,
                 'approved_by' => $user->id,
                 'ofisi_id' => $ofisi->id,
                 'loan_id' => $loan->id,
                 'customer_id' => null,
+                'is_loan_source' => true,
             ]);
 
             $this->sendNotification(
@@ -597,6 +599,168 @@ class LoanController extends Controller
             return response()->json(['error' => 'Ombi la mkopo limeshindikana kuwekewa kasoro.', 'message' => $e->getMessage()], 500);
         }
     }
+
+    public function haririMkopo(LoanRequest $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'jinaKikundi' => 'nullable|string|max:255',
+            'amount' => 'required|numeric|min:0',
+            'riba' => 'required|numeric|min:0|max:100',
+            'fomu' => 'required|numeric|min:0|max:100',
+            'totalDue' => 'required|numeric|min:0',
+            'kipindiMalipo' => 'required|in:siku,wiki,mwezi,mwaka',
+            'mudaMalipo' => 'nullable|integer|min:1',
+            'userId' => 'required|exists:users,id',
+            'ofisiId' => 'required|exists:ofisis,id',
+            'loanId' => 'required|exists:loans,id',
+            'loanType' => 'required|in:kikundi,binafsi',
+            'wateja' => 'nullable|array',
+            'wateja.*' => 'exists:customers,id',
+            'wadhamini' => 'nullable|array',
+            'wadhamini.*' => 'exists:customers,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $user = Auth::user();
+            $helpNumber = env('APP_HELP');
+            $appName = env('APP_NAME');
+
+            if (!$user) {
+                throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+            }
+
+            if (!$user->activeOfisi) {
+                throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+            }
+
+            $userOfisi = UserOfisi::where('user_id', $user->id)
+                ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+                ->first();
+
+            $ofisi = $userOfisi->ofisi;
+            $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
+            $position = $ofisi->pivot->position_id;
+
+            $positionRecord = Position::find($position);
+            if (!$positionRecord) {
+                throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+            }
+
+            $cheo = $positionRecord->name;
+            $loan = Loan::findOrFail($request->loanId);
+
+            // Backup old data before update
+            $loanBackUp = $loan->only([
+                'amount', 'riba', 'fomu', 'total_due',
+                'kipindi_malipo', 'muda_malipo', 'loan_type',
+                'user_id', 'ofisi_id', 'jina_kikundi'
+            ]);
+
+            // Update loan
+            $loan->update([
+                'amount' => $request->amount,
+                'riba' => $request->riba,
+                'fomu' => $request->fomu,
+                'total_due' => $request->totalDue,
+                'kipindi_malipo' => $request->kipindiMalipo,
+                'muda_malipo' => $request->mudaMalipo,
+                'loan_type' => $request->loanType,
+                'user_id' => $request->userId,
+                'ofisi_id' => $request->ofisiId,
+                'jina_kikundi' => $request->jinaKikundi,
+            ]);
+
+            // Update loan customers
+            if ($request->has('wateja')) {
+                LoanCustomer::where('loan_id', $loan->id)->delete();
+                $loanCustomers = array_map(fn($id) => [
+                    'loan_id' => $loan->id,
+                    'customer_id' => $id
+                ], $request->wateja);
+                LoanCustomer::insert($loanCustomers);
+            }
+
+            // Update guarantors
+            if ($request->has('wadhamini')) {
+                Mdhamini::where('loan_id', $loan->id)->delete();
+                $guarantors = array_map(fn($id) => [
+                    'loan_id' => $loan->id,
+                    'customer_id' => $id
+                ], $request->wadhamini);
+                Mdhamini::insert($guarantors);
+            }
+
+            // Get customer names
+            $customers = $request->filled('wateja')
+                ? Customer::whereIn('id', $request->wateja)->pluck('jina')
+                : collect();
+            $names = $customers->join(', ', ' pamoja na ');
+
+            // Get dhamana info
+            $dhamana = Dhamana::where('loan_id', $loan->id)->get();
+            $dhamanaNames = $dhamana->pluck('jina')->join(', ', ' pamoja na ');
+            $totalThamani = $dhamana->sum('thamani');
+
+            // Log backup before update (pretty printed JSON)
+            Mabadiliko::create([
+                'loan_id' => $loan->id,
+                'performed_by' => Auth::id(),
+                'action' => 'updated',
+                'description' => "Mkopo huu ulihaririwa na kubadilishwa, maelezo ya mkopo kabla ya mabadiliko:\n" .
+                    json_encode($loanBackUp, JSON_PRETTY_PRINT) .
+                    "\nMhariri: {$cheo} {$user->jina_kamili} ({$user->mobile})",
+            ]);
+
+            // Update related transactions
+            $fomuMkopo = $loan->amount * ($loan->fomu / 100);
+            Transaction::where('loan_id', $loan->id)
+                ->where('category', 'fomu')
+                ->update([
+                    'amount' => $fomuMkopo,
+                    'description' => "Makato Fomu ya Tsh {$fomuMkopo} kwenye mkopo wa {$names}",
+                ]);
+
+            Transaction::where('loan_id', $loan->id)
+                ->where('category', 'mkopo')
+                ->update([
+                    'amount' => $loan->amount,
+                    'description' => "Mkopo umelipwa kwa {$names}",
+                ]);
+
+            // Send notifications
+            $this->sendNotification(
+                "Mkopo ulio hai umeufanyia mabadiliko na kubadilisha taarifa, maelezo ya mkopo kabla ya mabadiliko:\n" .
+                    json_encode($loanBackUp, JSON_PRETTY_PRINT) .
+                    "\nMhariri: {$cheo} {$user->jina_kamili} ({$user->mobile}). Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $user->id,
+                null,
+                $ofisi->id
+            );
+
+            $this->sendNotificationKwaViongoziWengine(
+                "Mkopo ulio hai umefanyiwa mabadiliko na kubadilishiwa taarifa, maelezo ya mkopo kabla ya mabadiliko:\n" .
+                    json_encode($loanBackUp, JSON_PRETTY_PRINT) .
+                    "\nMhariri: {$cheo} {$user->jina_kamili} ({$user->mobile}). Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $ofisi->id,
+                $user->id
+            );
+
+            DB::commit();
+            return response()->json(['message' => 'Mkopo umehaririwa kikamilifu.', 'loan' => $loan], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Ombi la mkopo limeshindikana kuhaririwa.',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 
     private function sendNotificationUongozi($messageContent, $ofisiId)
     {
