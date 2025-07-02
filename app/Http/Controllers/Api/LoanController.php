@@ -761,6 +761,106 @@ class LoanController extends Controller
         }
     }
 
+    public function fungaMkopo(LoanRequest $request)
+    {
+        $user = Auth::user();
+        $helpNumber = env('APP_HELP');
+        $appName = env('APP_NAME');
+
+        if (!$user) {
+            throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        }
+
+        if (!$user->activeOfisi) {
+            throw new \Exception("Kuna tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        }
+
+        $userOfisi = UserOfisi::where('user_id', $user->id)
+            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
+            ->first();
+
+        if (!$userOfisi || !$userOfisi->ofisi) {
+            throw new \Exception("Kuna tatizo kwenye usajili wako wa ofisi. Tafadhali wasiliana na msaada.");
+        }
+
+        $ofisi = $userOfisi->ofisi;
+        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
+        $position = $ofisi->pivot->position_id;
+
+        $positionRecord = Position::find($position);
+        if (!$positionRecord) {
+            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+        }
+
+        $cheo = $positionRecord->name;
+
+        $validator = Validator::make($request->all(), [
+            'loanId' => 'required|exists:loans,id',
+            'sababu' => 'required|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $loan = Loan::with('customers')->findOrFail($request->loanId);
+
+            // Funga mkopo
+            $loan->update([
+                'status' => 'closed',
+                'status_details' => $request->sababu,
+            ]);
+
+            // Log mabadiliko
+            Mabadiliko::create([
+                'loan_id' => $loan->id,
+                'performed_by' => $user->id,
+                'action' => 'updated',
+                'description' => "Mkopo huu umefungwa kwa sababu ya {$request->sababu} na {$cheo} {$user->jina_kamili} ({$user->mobile})",
+            ]);
+
+            // Futa miamala husika
+            Transaction::where('loan_id', $loan->id)->update([
+                'status' => 'cancelled',
+            ]);
+
+            // Tayarisha majina ya wateja (kwa ajili ya notification)
+            $customerNames = $loan->customers->pluck('jina');
+            $namesString = $customerNames->count() > 1
+                ? $customerNames->slice(0, -1)->implode(', ') . ' pamoja na ' . $customerNames->last()
+                : $customerNames->first();
+
+            // Tuma notification kwa mhusika
+            $this->sendNotification(
+                "Mkopo wa {$namesString} umefungwa kikamilifu kwa sababu ya {$request->sababu}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $user->id,
+                null,
+                $ofisi->id
+            );
+
+            // Tuma notification kwa viongozi wengine
+            $this->sendNotificationKwaViongoziWengine(
+                "Mkopo wa {$namesString} umefungwa na {$cheo} {$user->jina_kamili} ({$user->mobile}), kwa sababu ya {$request->sababu}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                $ofisi->id,
+                $user->id
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Mkopo umefungwa kikamilifu.',
+                'loan' => $loan,
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Ombi la mkopo limeshindikana kufungwa.',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 
     private function sendNotificationUongozi($messageContent, $ofisiId)
     {

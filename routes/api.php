@@ -61,6 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('getMiamalaByDay', [MiamalaController::class, 'getMiamalaByDay']);
     Route::post('getMiamalaByDates', [MiamalaController::class, 'getMiamalaByDates']);
     Route::post('haririMkopo', [LoanController::class, 'haririMkopo']);
+    Route::post('fungaMkopo', [LoanController::class, 'fungaMkopo']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);
