@@ -419,7 +419,6 @@ class LoanController extends Controller
                 'description' => "Mkopo wa kiasi cha Tsh {$loan->amount}, wa {$names} umepitishwa na {$cheo} {$user->jina_kamili} wa simu namba {$user->mobile}.",
             ]);
 
-            $ribaMkopo = $loan->amount * ($loan->riba/100);
             $fomuMkopo = $loan->amount * ($loan->fomu/100);
 
             // Create the transaction record
