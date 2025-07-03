@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserOfisi extends Model
 {
+    protected $table = 'user_ofisis';
+
     public function position():BelongsTo
     {
         return $this->belongsTo(Position::class);

@@ -17,6 +17,7 @@ return new class extends Migration
             $table->unsignedBigInteger('ofisi_id');
             $table->unsignedBigInteger('position_id')->nullable();
             $table->enum('status', ['pending', 'accepted', 'denied'])->default('pending');
+            $table->boolean('isActive')->default(false);
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');

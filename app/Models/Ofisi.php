@@ -9,10 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Ofisi extends Model
 {
-     public function users():BelongsToMany
+    public function users():BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_ofisis')->latest()
-            ->withPivot('position_id', 'status')
+            ->withPivot('position_id', 'status','isActive')
             ->withTimestamps()
             ->leftJoin('positions', 'user_ofisis.position_id', '=', 'positions.id')
             ->select('users.*', 'positions.name as position_name');
@@ -23,7 +23,12 @@ class Ofisi extends Model
     {
         return $this->belongsToMany(User::class, 'user_ofisis')
                     ->withPivot('status')
-                    ->wherePivot('status', 'accepted');
+                    ->wherePivot('status', 'accepted'); 
+    }
+
+    public function userOfisis()
+    {
+        return $this->hasMany(UserOfisi::class);
     }
 
     public function positions():HasManyThrough

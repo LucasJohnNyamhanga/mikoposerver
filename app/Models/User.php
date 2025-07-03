@@ -41,10 +41,32 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    public function kifurushis()
+    {
+        return $this->belongsToMany(Kifurushi::class, 'user_kifurushis')
+                    ->withPivot(['start_date', 'end_date'])
+                    ->withTimestamps();
+    }
+
+    public function userKifurushis()
+    {
+        return $this->hasMany(UserKifurushi::class);
+    }
+
+    public function currentKifurushi()
+    {
+        return $this->hasOne(UserKifurushi::class)->latestOfMany(); // or your own logic
+    }
+
+    public function kifurushiPurchases()
+    {
+        return $this->hasMany(KifurushiPurchase::class);
+    }
+
     public function maofisi(): BelongsToMany
     {
         return $this->belongsToMany(Ofisi::class, 'user_ofisis')
-                    ->withPivot('position_id', 'status')
+                    ->withPivot('position_id', 'status', 'isActive')
                     ->withTimestamps();
     }
 
