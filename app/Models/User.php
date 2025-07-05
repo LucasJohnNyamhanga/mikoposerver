@@ -118,6 +118,19 @@ class User extends Authenticatable
         return $this->hasMany(TransactionChange::class);
     }
 
+    public function positionInOfisi($ofisiId)
+    {
+        $userOfisi = $this->maofisi()
+            ->where('ofisi_id', $ofisiId)
+            ->first();
+
+        if ($userOfisi && $userOfisi->pivot->position_id) {
+            return Position::find($userOfisi->pivot->position_id);
+        }
+
+        return null;
+    }
+
     protected $fillable = [
         'mobile',
         'jina_kamili',

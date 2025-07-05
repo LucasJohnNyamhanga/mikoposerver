@@ -42,13 +42,38 @@ class MiamalaController extends Controller
         DB::beginTransaction();
 
         try {
-            $ofisi = Ofisi::findOrFail($request->ofisiId); // Ensure the office exists
+            $ofisi = Ofisi::findOrFail($request->ofisiId);
             $user = Auth::user();
 
             $appName = env('APP_NAME');
             $helpNumber = env('APP_HELP');
 
-            // Create the transaction record
+            // 1. Retrieve the loan
+            $loan = Loan::findOrFail($request->loanId);
+
+            // 2. Ensure loan status is valid
+            if (!in_array($loan->status, ['approved', 'defaulted'])) {
+                return response()->json([
+                    'error' => 'Mkopo huu haujaruhusiwa kwa marejesho. Hakikisha mkopo umeidhinishwa kwanza.'
+                ], 400);
+            }
+
+            // 3. Calculate total repayment so far
+            $totalRejesho = Transaction::where('loan_id', $loan->id)
+                ->where('category', 'rejesho')
+                ->sum('amount');
+
+            // 4. Compute remaining balance
+            $remainingBalance = $loan->total_due - $totalRejesho;
+
+            // 5. Prevent overpayment
+            if ($request->amount > $remainingBalance) {
+                return response()->json([
+                    'error' => "Marejesho yamepitiliza. Kiasi kilichobaki ni Tsh " . number_format($remainingBalance) . ". Tafadhali lipa kiasi kinachotakiwa."
+                ], 400);
+            }
+
+            // 6. Create the transaction record
             $transaction = Transaction::create([
                 'type' => $request->type,
                 'category' => $request->category,
@@ -64,8 +89,14 @@ class MiamalaController extends Controller
                 'customer_id' => $request->mtejaId,
             ]);
 
-            // Retrieve the loan and associated customers
-            $loan = Loan::findOrFail($request->loanId);
+            // 7. Check if loan is now fully repaid
+            $totalRejesho += $request->amount; // Add current payment
+            if ($totalRejesho >= $loan->total_due) {
+                $loan->status = 'repaid';
+                $loan->save();
+            }
+
+            // 8. Get loan customer names
             $customers = Customer::whereIn(
                 'id',
                 DB::table('loan_customers')
@@ -73,10 +104,9 @@ class MiamalaController extends Controller
                     ->pluck('customer_id')
             )->pluck('jina');
 
-            // Format customer names
             $names = $this->formatCustomerNames($customers);
 
-            // Send notifications
+            // 9. Send notifications
             $this->sendNotification(
                 "Hongera, rejesho la Tsh {$request->amount} la mkopo wa {$names} limepokelewa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
                 $user->id,
@@ -85,7 +115,7 @@ class MiamalaController extends Controller
             );
 
             $this->sendNotificationKwaViongoziWengine(
-                "Rejesho la Tsh {$request->amount} la mkopo wa {$names} limepokelewa na mtumishi {$user->jina_kamili} mwenye simu namba {$user->mobile}, wateja wa mkopo huo ni {$names}. Asante kwa kutumia mfumo wa mikopo center.",
+                "Rejesho la Tsh {$request->amount} la mkopo wa {$names} limepokelewa na mtumishi {$user->jina_kamili} mwenye simu namba {$user->mobile}, wateja wa mkopo huo ni {$names}. Asante kwa kutumia mfumo wa Mikopo Center.",
                 $ofisi->id,
                 $user->id
             );
@@ -105,6 +135,7 @@ class MiamalaController extends Controller
             ], 500);
         }
     }
+
 
     public function lipiaFaini(MiamalaRequest $request)
     {
