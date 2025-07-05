@@ -36,7 +36,7 @@ class MiamalaController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json(['message' => $validator->errors()->first()], 422);
         }
 
         DB::beginTransaction();
@@ -54,7 +54,7 @@ class MiamalaController extends Controller
             // 2. Ensure loan status is valid
             if (!in_array($loan->status, ['approved', 'defaulted'])) {
                 return response()->json([
-                    'error' => 'Mkopo huu haujaruhusiwa kwa marejesho. Hakikisha mkopo umeidhinishwa kwanza.'
+                    'message' => 'Mkopo huu haujaruhusiwa kwa marejesho.'
                 ], 400);
             }
 
@@ -69,7 +69,7 @@ class MiamalaController extends Controller
             // 5. Prevent overpayment
             if ($request->amount > $remainingBalance) {
                 return response()->json([
-                    'error' => "Marejesho yamepitiliza. Kiasi kilichobaki ni Tsh " . number_format($remainingBalance) . ". Tafadhali lipa kiasi kinachotakiwa."
+                    'message' => "Rejesho limepita kiasi kilichobaki. Tafadhari lipa Tsh " . number_format($remainingBalance) . "."
                 ], 400);
             }
 
