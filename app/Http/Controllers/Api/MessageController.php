@@ -33,17 +33,21 @@ class MessageController extends Controller
             ], 404);
         }
 
-        // Efficient bulk update
-        Message::where([
-                ['receiver_id', '=', $user->id],
-                ['ofisi_id', '=', $ofisi->id],
-                ['status', '=', 'unread'],
-            ])
-            ->update(['status' => 'read']);
+        try {
+            Message::where([
+                    ['receiver_id', '=', $user->id],
+                    ['ofisi_id', '=', $ofisi->id],
+                    ['status', '=', 'unread'],
+                ])
+                ->update(['status' => 'read']);
 
-        return response()->json([
-            'message' =>  "Ujumbe umewekwa kuwa zimesoma."
-        ], 200);
+            return response()->json([
+                'message' =>  "Ujumbe umewekwa kuwa zimesoma."
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => "Tatizo ni: " . $e->getMessage()
+            ], 500);
+        }
     }
-
 }

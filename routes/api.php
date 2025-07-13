@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\MiamalaController;
 use App\Http\Controllers\Api\OfisiController;
 use App\Http\Controllers\Api\TransactionChangeController;
 use App\Http\Controllers\Api\UploadController;
+use App\Http\Controllers\Api\VifurushiController;
 use App\Http\Controllers\Api\ZenoPayController;
 use App\Http\Controllers\Api\ZenoPayWebhookController;
 use Illuminate\Http\Request;
@@ -67,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('getCustomerLoanDetails', [LoanController::class, 'getCustomerLoanDetails']);
     Route::post('haririMteja', [CustomerController::class, 'haririMteja']);
     Route::post('initiatePayment', [ZenoPayController::class, 'initiatePayment']);
+    Route::get('getVifurushi', [VifurushiController::class, 'getVifurushi']);
     Route::get('/payment-status/{reference}', function ($reference) {
         $payment = \App\Models\Payment::where('reference', $reference)->first();
     
@@ -76,6 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
         return response()->json(['status' => $payment->status]);
     });
+    
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);
