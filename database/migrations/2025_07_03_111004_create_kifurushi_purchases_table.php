@@ -16,9 +16,15 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('kifurushi_id')->constrained()->onDelete('cascade');
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
+            $table->date('start_date')->nullable();
+            $table->date('end_date')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamp('approved_at')->nullable();
+            $table->string('reference')->nullable()->unique(); // optional
             $table->timestamps();
-        });
+        
+            $table->index(['user_id', 'status']);
+        });        
     }
 
     /**

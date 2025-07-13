@@ -48,21 +48,6 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
-    public function userKifurushis()
-    {
-        return $this->hasMany(UserKifurushi::class);
-    }
-
-    public function currentKifurushi()
-    {
-        return $this->hasOne(UserKifurushi::class)->latestOfMany(); // or your own logic
-    }
-
-    public function kifurushiPurchases()
-    {
-        return $this->hasMany(KifurushiPurchase::class);
-    }
-
     public function maofisi(): BelongsToMany
     {
         return $this->belongsToMany(Ofisi::class, 'user_ofisis')
@@ -129,6 +114,16 @@ class User extends Authenticatable
         }
 
         return null;
+    }
+
+    public function kifurushiPurchases(): HasMany
+    {
+        return $this->hasMany(KifurushiPurchase::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
     }
 
     protected $fillable = [

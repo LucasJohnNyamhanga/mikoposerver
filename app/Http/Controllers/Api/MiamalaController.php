@@ -577,7 +577,7 @@ class MiamalaController extends Controller
         $positionId = optional($ofisi->pivot)->position_id;
         $positionRecord = Position::find($positionId);
 
-        abort_unless($positionRecord, 403, 'Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.');
+        abort_unless((bool)$positionRecord, 403, 'Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.');
 
         $validator = Validator::make($request->all(), [
             'startDate' => 'required|date',

@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\MiamalaController;
 use App\Http\Controllers\Api\OfisiController;
 use App\Http\Controllers\Api\TransactionChangeController;
 use App\Http\Controllers\Api\UploadController;
+use App\Http\Controllers\Api\ZenoPayController;
+use App\Http\Controllers\Api\ZenoPayWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -64,6 +66,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('fungaMkopo', [LoanController::class, 'fungaMkopo']);
     Route::post('getCustomerLoanDetails', [LoanController::class, 'getCustomerLoanDetails']);
     Route::post('haririMteja', [CustomerController::class, 'haririMteja']);
+    Route::post('initiatePayment', [ZenoPayController::class, 'initiatePayment']);
+    Route::get('/payment-status/{reference}', function ($reference) {
+        $payment = \App\Models\Payment::where('reference', $reference)->first();
+    
+        if (!$payment) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+    
+        return response()->json(['status' => $payment->status]);
+    });
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);
@@ -73,3 +85,4 @@ Route::get('validateOldRegisterRequest', [AuthController::class, 'validateOldReg
 Route::post('registerMtumishiNewOfisi', [AuthController::class, 'registerMtumishiNewOfisi']);
 Route::post('registerMtumishiOldOfisi', [AuthController::class, 'registerMtumishiOldOfisi']);
 Route::get('login', [AuthController::class, 'login']);
+Route::post('/zenopay/webhook', [ZenoPayWebhookController::class, 'handle'])->name('zenopay.webhook');

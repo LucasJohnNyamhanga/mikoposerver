@@ -3,23 +3,32 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Kifurushi extends Model
 {
-    public function users()
-    {
-        return $this->belongsToMany(User::class, 'user_kifurushis')
-                    ->withPivot(['start_date', 'end_date'])
-                    ->withTimestamps();
-    }
 
-    public function userKifurushis()
-    {
-        return $this->hasMany(UserKifurushi::class);
-    }
-
-    public function purchases()
+    public function purchases(): HasMany
     {
         return $this->hasMany(KifurushiPurchase::class);
     }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    protected $fillable = [
+        'name',
+        'description',
+        'number_of_offices',
+        'duration_in_days',
+        'price',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+        'price' => 'decimal:2',
+    ];
 }
