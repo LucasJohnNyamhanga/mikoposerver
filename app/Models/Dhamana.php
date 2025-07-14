@@ -23,13 +23,8 @@ class Dhamana extends Model
     }
 
     protected $fillable = [
-        'jina',
-        'thamani',
-        'maelezo',
-        'picha',
-        'loan_id',
-        'customer_id',
-        'ofisi_id',
-        'is_ofisi_owned',
+        'jina', 'thamani', 'maelezo', 'picha',
+        'is_ofisi_owned', 'is_sold', 'stored_at',
+        'loan_id', 'customer_id', 'ofisi_id',
     ];
 }

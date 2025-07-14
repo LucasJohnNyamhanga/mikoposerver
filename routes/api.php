@@ -69,16 +69,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('haririMteja', [CustomerController::class, 'haririMteja']);
     Route::post('initiatePayment', [ZenoPayController::class, 'initiatePayment']);
     Route::get('getVifurushi', [VifurushiController::class, 'getVifurushi']);
-    Route::get('/payment-status/{reference}', function ($reference) {
-        $payment = \App\Models\Payment::where('reference', $reference)->first();
-    
-        if (!$payment) {
-            return response()->json(['status' => 'not_found'], 404);
-        }
-    
-        return response()->json(['status' => $payment->status]);
-    });
-    
+    Route::get('paymentStatus', [VifurushiController::class, 'paymentStatus']);
+
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

@@ -15,22 +15,23 @@ return new class extends Migration
             $table->id();
             $table->string('jina');
             $table->decimal('thamani', 20, 2);
-            $table->string('maelezo');
-            $table->string('picha');
-            $table->boolean('is_ofisi_owned')->default(false);
-            $table->boolean('is_sold')->default(false);
-            $table->timestamps();
-
-            // Foreign keys
-            $table->foreignId('loan_id')->nullable();
-            $table->foreignId('customer_id')->nullable();
-            $table->foreignId('ofisi_id');
+            $table->text('maelezo')->nullable();
+            $table->string('picha')->nullable();
             
-            // Define foreign key constraints
-            $table->foreign('loan_id')->references('id')->on('loans')->onDelete('cascade');
-            $table->foreign('customer_id')->references('id')->on('customers')->onDelete('cascade');
-            $table->foreign('ofisi_id')->references('id')->on('ofisis')->onDelete('cascade');
-        });
+            // Ownership & custody flags
+            $table->boolean('is_ofisi_owned')->default(false); // TRUE = asset belongs to office
+            $table->boolean('is_sold')->default(false);
+            
+            // Custody: who holds the dhamana physically
+            $table->enum('stored_at', ['ofisi', 'customer'])->default('ofisi');
+        
+            $table->timestamps();
+        
+            // Foreign keys
+            $table->foreignId('loan_id')->nullable()->constrained()->onDelete('cascade');
+            $table->foreignId('customer_id')->nullable()->constrained()->onDelete('cascade'); // who owns the dhamana
+            $table->foreignId('ofisi_id')->constrained()->onDelete('cascade'); // where dhamana is managed
+        });        
     }
 
     /**

@@ -31,7 +31,7 @@ class ZenoPayController extends Controller
             'amount' => 'required|numeric|min:100',
             'mobile' => 'required|string|min:10|max:15',
             'reference' => 'required|string|max:50|unique:payments,reference',
-            'kifurushi_id' => 'required|exists:kifurushis,id',
+            'kifurushiId' => 'required|exists:kifurushis,id',
             'buyerEmail' => 'nullable|email',
             'buyerName' => 'nullable|string|max:100',
         ]);
@@ -67,7 +67,7 @@ class ZenoPayController extends Controller
                 'reference'     => $request->reference,
                 'amount'        => $request->amount,
                 'status'        => 'pending',
-                'kifurushi_id'  => $request->kifurushi_id,
+                'kifurushi_id'  => $request->kifurushiId,
                 'phone'         => $request->mobile,
                 'user_id'       => $user->id,
                 'channel'       => $channel,
