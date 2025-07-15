@@ -917,12 +917,14 @@ class LoanController extends Controller
                     },
                 ])->where('ofisi_id', $activeOfisiId);
             },
-            'mikopoAliyodhamini' => function ($loanQuery) use ($activeOfisiId) {
+            'mikopoAliyodhamini' => function ($loanQuery) use ($activeOfisiId, $customerId) {
                 $loanQuery->with([
                     'user',
                     'customers',
                     'wadhamini',
-                    'dhamana',
+                    'dhamana' => function ($query) use ($customerId) {
+                        $query->where('customer_id', $customerId)->latest();
+                    },
                     'transactions' => function ($query) {
                         $query->with(['user', 'approver', 'creator', 'customer'])
                             ->where('status', 'completed')
