@@ -152,6 +152,18 @@ class CustomerController extends Controller
                 ], 400);
             }
 
+            //mteja hatakiwi kuwa na mkopo aliodhamini ambao ['approved', 'defaulted']
+            $hasRestrictedGuarantorLoan = $mteja->mikopoAliyodhamini()
+                ->whereIn('status', ['approved', 'defaulted'])
+                ->exists();
+
+            if ($hasRestrictedGuarantorLoan) {
+                return response()->json([
+                    'message' => 'Huwezi hariri taarifa za mteja ambaye ni mdhamini wa mkopo hai au unaodaiwa.'
+                ], 400);
+            }
+
+
             // Update the specific customer
             $mteja->update([
                 'jina' => $request->jina,

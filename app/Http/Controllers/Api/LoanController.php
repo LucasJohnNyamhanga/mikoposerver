@@ -889,7 +889,6 @@ class LoanController extends Controller
             throw new \Exception("Wewe sio kiongozi wa ofisi, huna ruhusa ya kufanya kitendo hiki.");
         }
 
-        // Validate request
         $validator = Validator::make($request->all(), [
             'mtejaId' => 'required|exists:customers,id',
         ]);
@@ -900,9 +899,9 @@ class LoanController extends Controller
 
         $customerId = $request->mtejaId;
 
-        // Fetch customer and nested loan data
+        // Load customer with both relationships filtered by office
         $customer = Customer::with([
-            'loans' => function ($loanQuery) {
+            'loans' => function ($loanQuery) use ($activeOfisiId) {
                 $loanQuery->with([
                     'user',
                     'customers',
@@ -914,29 +913,47 @@ class LoanController extends Controller
                             ->latest();
                     },
                     'mabadiliko' => function ($query) {
-                        $query->with([
-                            'user',
-                        ])->latest();
+                        $query->with(['user'])->latest();
                     },
-                ]);
+                ])->where('ofisi_id', $activeOfisiId);
+            },
+            'mikopoAliyodhamini' => function ($loanQuery) use ($activeOfisiId) {
+                $loanQuery->with([
+                    'user',
+                    'customers',
+                    'wadhamini',
+                    'dhamana',
+                    'transactions' => function ($query) {
+                        $query->with(['user', 'approver', 'creator', 'customer'])
+                            ->where('status', 'completed')
+                            ->latest();
+                    },
+                    'mabadiliko' => function ($query) {
+                        $query->with(['user'])->latest();
+                    },
+                ])->where('ofisi_id', $activeOfisiId);
             },
         ])->findOrFail($customerId);
 
-        // Inject officer position into loan.user object
+        // Add position info for loan users in borrowed loans
         foreach ($customer->loans as $loan) {
             if ($loan->user) {
                 $loan->user->position_in_active_ofisi = $loan->user->positionInOfisi($activeOfisiId);
             }
         }
 
+        // Add position info for loan users in guaranteed loans
+        foreach ($customer->mikopoAliyodhamini as $loan) {
+            if ($loan->user) {
+                $loan->user->position_in_active_ofisi = $loan->user->positionInOfisi($activeOfisiId);
+            }
+        }
+
         return response()->json([
-            'message' => 'Taarifa zimepatikana',
-            'data' => $customer,
+            'borrowed_loans' => $customer,
+            'guaranteed_loans' => $customer,
         ]);
     }
-
-    
-
 
     private function sendNotificationUongozi($messageContent, $ofisiId)
     {

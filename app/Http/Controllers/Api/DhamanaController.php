@@ -13,6 +13,7 @@ use App\Models\UserOfisi;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule as ValidationRule;
 
 class DhamanaController extends Controller
 {
@@ -30,6 +31,7 @@ class DhamanaController extends Controller
                 'loanId' => 'required|exists:loans,id',
                 'customerId' => 'required|exists:customers,id',
                 'ofisiId' => 'required|exists:ofisis,id',
+                'dhamanaIlipo' => ['required', ValidationRule::in(['ofisi', 'customer'])],
             ]);
 
             $appName = env('APP_NAME');
@@ -73,6 +75,8 @@ class DhamanaController extends Controller
                 'customer_id' => $request->customerId,
                 'ofisi_id' => $request->ofisiId,
                 'is_ofisi_owned' => false,
+                'is_sold' => false,
+                'stored_at' => $request->dhamanaIlipo,
             ]);
 
             $this->sendNotification(
