@@ -219,9 +219,48 @@ class LoanController extends Controller
 
             // Handle Guarantors
             if ($request->has('wadhamini')) {
+                $oldGuarantors = Mdhamini::where('loan_id', $loan->id)
+                    ->pluck('customer_id')
+                    ->toArray();
+
+                $newGuarantors = $request->wadhamini ?? [];
+
+                // Which guarantors were removed?
+                $removedGuarantors = array_diff($oldGuarantors, $newGuarantors);
+
+                if (!empty($removedGuarantors)) {
+                    // Dhamana belonging to removed guarantors
+                    $oldDhamanas = Dhamana::where('loan_id', $loan->id)
+                        ->whereIn('customer_id', $removedGuarantors)
+                        ->get();
+
+                    foreach ($oldDhamanas as $dhamana) {
+                        if ($dhamana->picha) {
+                            $imagePath = public_path('uploads/dhamana/' . $dhamana->picha);
+                            if (is_file($imagePath)) {
+                                @unlink($imagePath); // suppress warnings
+                            }
+                        }
+                    }
+
+                    // Delete dhamana for removed guarantors
+                    Dhamana::where('loan_id', $loan->id)
+                        ->whereIn('customer_id', $removedGuarantors)
+                        ->delete();
+                }
+
+                // Remove all current guarantor rows & insert new ones
                 Mdhamini::where('loan_id', $loan->id)->delete();
-                $guarantors = array_map(fn($id) => ['loan_id' => $loan->id, 'customer_id' => $id], $request->wadhamini);
-                Mdhamini::insert($guarantors);
+
+                $guarantors = collect($newGuarantors)
+                    ->map(fn($id) => [
+                        'loan_id'     => $loan->id,
+                        'customer_id' => $id,
+                    ])->toArray();
+
+                if (!empty($guarantors)) {
+                    Mdhamini::insert($guarantors);
+                }
             }
 
             
@@ -601,22 +640,23 @@ class LoanController extends Controller
 
     public function haririMkopo(LoanRequest $request)
     {
+        // Validate request
         $validator = Validator::make($request->all(), [
-            'jinaKikundi' => 'nullable|string|max:255',
-            'amount' => 'required|numeric|min:0',
-            'riba' => 'required|numeric|min:0|max:100',
-            'fomu' => 'required|numeric|min:0|max:100',
-            'totalDue' => 'required|numeric|min:0',
+            'jinaKikundi'   => 'nullable|string|max:255',
+            'amount'        => 'required|numeric|min:0',
+            'riba'          => 'required|numeric|min:0|max:100',
+            'fomu'          => 'required|numeric|min:0|max:100',
+            'totalDue'      => 'required|numeric|min:0',
             'kipindiMalipo' => 'required|in:siku,wiki,mwezi,mwaka',
-            'mudaMalipo' => 'nullable|integer|min:1',
-            'userId' => 'required|exists:users,id',
-            'ofisiId' => 'required|exists:ofisis,id',
-            'loanId' => 'required|exists:loans,id',
-            'loanType' => 'required|in:kikundi,binafsi',
-            'wateja' => 'nullable|array',
-            'wateja.*' => 'exists:customers,id',
-            'wadhamini' => 'nullable|array',
-            'wadhamini.*' => 'exists:customers,id',
+            'mudaMalipo'    => 'nullable|integer|min:1',
+            'userId'        => 'required|exists:users,id',
+            'ofisiId'       => 'required|exists:ofisis,id',
+            'loanId'        => 'required|exists:loans,id',
+            'loanType'      => 'required|in:kikundi,binafsi',
+            'wateja'        => 'nullable|array',
+            'wateja.*'      => 'exists:customers,id',
+            'wadhamini'     => 'nullable|array',
+            'wadhamini.*'   => 'exists:customers,id',
         ]);
 
         if ($validator->fails()) {
@@ -625,140 +665,232 @@ class LoanController extends Controller
 
         DB::beginTransaction();
         try {
-            $user = Auth::user();
+            $user       = Auth::user();
             $helpNumber = env('APP_HELP');
-            $appName = env('APP_NAME');
+            $appName    = env('APP_NAME');
 
             if (!$user) {
                 throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
             }
 
             if (!$user->activeOfisi) {
-                throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+                throw new \Exception("Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
             }
 
+            // Validate user's office + position
             $userOfisi = UserOfisi::where('user_id', $user->id)
                 ->where('ofisi_id', $user->activeOfisi->ofisi_id)
                 ->first();
 
-            $ofisi = $userOfisi->ofisi;
-            $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
-            $position = $ofisi->pivot->position_id;
-
-            $positionRecord = Position::find($position);
-            if (!$positionRecord) {
-                throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+            if (!$userOfisi || !$userOfisi->ofisi) {
+                throw new \Exception("Kuna hitilafu kwenye usajili wako wa ofisi. Wasiliana na msaada.");
             }
 
-            $cheo = $positionRecord->name;
+            $ofisi    = $userOfisi->ofisi;
+            $position = Position::find($userOfisi->position_id);
+
+            if (!$position) {
+                throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kufanya kitendo hiki.");
+            }
+
+            $cheo = $position->name;
+
+            // Target loan
             $loan = Loan::findOrFail($request->loanId);
 
-            // Backup old data before update
+            // Backup before update
             $loanBackUp = $loan->only([
                 'amount', 'riba', 'fomu', 'total_due',
                 'kipindi_malipo', 'muda_malipo', 'loan_type',
                 'user_id', 'ofisi_id', 'jina_kikundi'
             ]);
 
-            // Update loan
+            // Update loan core fields
             $loan->update([
-                'amount' => $request->amount,
-                'riba' => $request->riba,
-                'fomu' => $request->fomu,
-                'total_due' => $request->totalDue,
+                'amount'         => $request->amount,
+                'riba'           => $request->riba,
+                'fomu'           => $request->fomu,
+                'total_due'      => $request->totalDue,
                 'kipindi_malipo' => $request->kipindiMalipo,
-                'muda_malipo' => $request->mudaMalipo,
-                'loan_type' => $request->loanType,
-                'user_id' => $request->userId,
-                'ofisi_id' => $request->ofisiId,
-                'jina_kikundi' => $request->jinaKikundi,
+                'muda_malipo'    => $request->mudaMalipo,
+                'loan_type'      => $request->loanType,
+                'user_id'        => $request->userId,
+                'ofisi_id'       => $request->ofisiId,
+                'jina_kikundi'   => $request->jinaKikundi,
             ]);
 
-            // Update loan customers
+            /*
+            |--------------------------------------------------------------------------
+            | Update Loan Customers (Borrowers)
+            |--------------------------------------------------------------------------
+            */
             if ($request->has('wateja')) {
                 LoanCustomer::where('loan_id', $loan->id)->delete();
-                $loanCustomers = array_map(fn($id) => [
-                    'loan_id' => $loan->id,
-                    'customer_id' => $id
-                ], $request->wateja);
-                LoanCustomer::insert($loanCustomers);
+
+                $loanCustomers = collect($request->wateja ?? [])
+                    ->map(fn($id) => [
+                        'loan_id'     => $loan->id,
+                        'customer_id' => $id,
+                    ])->toArray();
+
+                if (!empty($loanCustomers)) {
+                    LoanCustomer::insert($loanCustomers);
+                }
             }
 
-            // Update guarantors
+            /*
+            |--------------------------------------------------------------------------
+            | Update Guarantors + Clean Up Dhamana for Removed Guarantors Only
+            |--------------------------------------------------------------------------
+            | Steps:
+            | 1. Get old guarantor IDs.
+            | 2. Compare with new list (if provided).
+            | 3. Delete dhamana + images for removed guarantors.
+            | 4. Replace Mdhamini rows with new list.
+            */
             if ($request->has('wadhamini')) {
+                $oldGuarantors = Mdhamini::where('loan_id', $loan->id)
+                    ->pluck('customer_id')
+                    ->toArray();
+
+                $newGuarantors = $request->wadhamini ?? [];
+
+                // Which guarantors were removed?
+                $removedGuarantors = array_diff($oldGuarantors, $newGuarantors);
+
+                if (!empty($removedGuarantors)) {
+                    // Dhamana belonging to removed guarantors
+                    $oldDhamanas = Dhamana::where('loan_id', $loan->id)
+                        ->whereIn('customer_id', $removedGuarantors)
+                        ->get();
+
+                    foreach ($oldDhamanas as $dhamana) {
+                        if ($dhamana->picha) {
+                            $imagePath = public_path('uploads/dhamana/' . $dhamana->picha);
+                            if (is_file($imagePath)) {
+                                @unlink($imagePath); // suppress warnings
+                            }
+                        }
+                    }
+
+                    // Delete dhamana for removed guarantors
+                    Dhamana::where('loan_id', $loan->id)
+                        ->whereIn('customer_id', $removedGuarantors)
+                        ->delete();
+                }
+
+                // Remove all current guarantor rows & insert new ones
                 Mdhamini::where('loan_id', $loan->id)->delete();
-                $guarantors = array_map(fn($id) => [
-                    'loan_id' => $loan->id,
-                    'customer_id' => $id
-                ], $request->wadhamini);
-                Mdhamini::insert($guarantors);
+
+                $guarantors = collect($newGuarantors)
+                    ->map(fn($id) => [
+                        'loan_id'     => $loan->id,
+                        'customer_id' => $id,
+                    ])->toArray();
+
+                if (!empty($guarantors)) {
+                    Mdhamini::insert($guarantors);
+                }
             }
 
-            // Get customer names
-            $customers = $request->filled('wateja')
-                ? Customer::whereIn('id', $request->wateja)->pluck('jina')
-                : collect();
+            /*
+            |--------------------------------------------------------------------------
+            | Names & Dhamana Info (for logging & notifications)
+            |--------------------------------------------------------------------------
+            */
+            // Borrower names (if request gave new list use that, else load from DB)
+            if ($request->has('wateja')) {
+                $customers = !empty($request->wateja)
+                    ? Customer::whereIn('id', $request->wateja)->pluck('jina')
+                    : collect();
+            } else {
+                $customers = $loan->customers()->pluck('jina');
+            }
             $names = $customers->join(', ', ' pamoja na ');
 
-            // Get dhamana info
+            // Dhamana info (post-update state)
             $dhamana = Dhamana::where('loan_id', $loan->id)->get();
             $dhamanaNames = $dhamana->pluck('jina')->join(', ', ' pamoja na ');
             $totalThamani = $dhamana->sum('thamani');
 
-            // Log backup before update (pretty printed JSON)
-            Mabadiliko::create([
-                'loan_id' => $loan->id,
-                'performed_by' => Auth::id(),
-                'action' => 'updated',
-                'description' => "Mkopo huu ulihaririwa na kubadilishwa, maelezo ya mkopo kabla ya mabadiliko:\n" .
-                    json_encode($loanBackUp, JSON_PRETTY_PRINT) .
-                    "\nMhariri: {$cheo} {$user->jina_kamili} ({$user->mobile})",
-            ]);
-
-            // Update related transactions
+            /*
+            |--------------------------------------------------------------------------
+            | Update Related Transactions
+            |--------------------------------------------------------------------------
+            */
             $fomuMkopo = $loan->amount * ($loan->fomu / 100);
+
             Transaction::where('loan_id', $loan->id)
                 ->where('category', 'fomu')
                 ->update([
-                    'amount' => $fomuMkopo,
+                    'amount'      => $fomuMkopo,
                     'description' => "Makato Fomu ya Tsh {$fomuMkopo} kwenye mkopo wa {$names}",
                 ]);
 
             Transaction::where('loan_id', $loan->id)
                 ->where('category', 'mkopo')
                 ->update([
-                    'amount' => $loan->amount,
+                    'amount'      => $loan->amount,
                     'description' => "Mkopo umelipwa kwa {$names}",
                 ]);
 
-            // Send notifications
-            $this->sendNotification(
-                "Mkopo ulio hai umeufanyia mabadiliko na kubadilisha taarifa, maelezo ya mkopo kabla ya mabadiliko:\n" .
+            /*
+            |--------------------------------------------------------------------------
+            | Log Change (Mabadiliko)
+            |--------------------------------------------------------------------------
+            */
+            Mabadiliko::create([
+                'loan_id'      => $loan->id,
+                'performed_by' => Auth::id(),
+                'action'       => 'updated',
+                'description'  =>
+                    "Mkopo huu ulihaririwa na kubadilishwa, maelezo ya mkopo kabla ya mabadiliko:\n" .
                     json_encode($loanBackUp, JSON_PRETTY_PRINT) .
-                    "\nMhariri: {$cheo} {$user->jina_kamili} ({$user->mobile}). Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                    "\nMhariri: {$cheo} {$user->jina_kamili} ({$user->mobile}).",
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Send Notifications
+            |--------------------------------------------------------------------------
+            */
+            $this->sendNotification(
+                "Mkopo ulio hai umefanyiwa mabadiliko:\n" .
+                json_encode($loanBackUp, JSON_PRETTY_PRINT) .
+                "\nDhamana: {$dhamanaNames} (Jumla Thamani: {$totalThamani})." .
+                "\nMhariri: {$cheo} {$user->jina_kamili} ({$user->mobile}). Asante kwa kutumia {$appName}, kwa msaada piga simu {$helpNumber}.",
                 $user->id,
                 null,
                 $ofisi->id
             );
 
             $this->sendNotificationKwaViongoziWengine(
-                "Mkopo ulio hai umefanyiwa mabadiliko na kubadilishiwa taarifa, maelezo ya mkopo kabla ya mabadiliko:\n" .
-                    json_encode($loanBackUp, JSON_PRETTY_PRINT) .
-                    "\nMhariri: {$cheo} {$user->jina_kamili} ({$user->mobile}). Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Mkopo umefanyiwa mabadiliko:\n" .
+                json_encode($loanBackUp, JSON_PRETTY_PRINT) .
+                "\nMhariri: {$cheo} {$user->jina_kamili} ({$user->mobile}). Asante kwa kutumia {$appName}, msaada: {$helpNumber}.",
                 $ofisi->id,
                 $user->id
             );
 
             DB::commit();
-            return response()->json(['message' => 'Mkopo umehaririwa kikamilifu.', 'loan' => $loan], 200);
+
+            // Optionally reload updated relations if client needs fresh data:
+            // $loan->load(['customers', 'wadhamini', 'dhamana']);
+
+            return response()->json([
+                'message' => 'Mkopo umehaririwa kikamilifu.',
+                'loan'    => $loan,
+            ], 200);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
-                'error' => 'Ombi la mkopo limeshindikana kuhaririwa.',
-                'message' => $e->getMessage()
+                'error'   => 'Ombi la mkopo limeshindikana kuhaririwa.',
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
+
 
     public function fungaMkopo(LoanRequest $request)
     {
