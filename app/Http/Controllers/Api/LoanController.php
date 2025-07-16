@@ -863,99 +863,107 @@ class LoanController extends Controller
 
     public function getCustomerLoanDetails(LoanRequest $request)
     {
-        $user = Auth::user();
-        $helpNumber = env('APP_HELP');
+        try {
+            $user = Auth::user();
+            $helpNumber = env('APP_HELP');
 
-        if (!$user) {
-            throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
-        }
-
-        if (!$user->activeOfisi) {
-            throw new \Exception("Huna ofisi unayoitumia kwa sasa. Piga simu msaada {$helpNumber}");
-        }
-
-        $activeOfisiId = $user->activeOfisi->ofisi_id;
-
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-            ->where('ofisi_id', $activeOfisiId)
-            ->first();
-
-        if (!$userOfisi || !$userOfisi->ofisi) {
-            throw new \Exception("Kuna tatizo kwenye usajili wako wa ofisi. Wasiliana na msaada.");
-        }
-
-        $position = Position::find($userOfisi->position_id);
-        if (!$position) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna ruhusa ya kufanya kitendo hiki.");
-        }
-
-        $validator = Validator::make($request->all(), [
-            'mtejaId' => 'required|exists:customers,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()->first()], 422);
-        }
-
-        $customerId = $request->mtejaId;
-
-        // Load customer with both relationships filtered by office
-        $customer = Customer::with([
-            'loans' => function ($loanQuery) use ($activeOfisiId) {
-                $loanQuery->with([
-                    'user',
-                    'customers',
-                    'wadhamini',
-                    'dhamana',
-                    'transactions' => function ($query) {
-                        $query->with(['user', 'approver', 'creator', 'customer'])
-                            ->where('status', 'completed')
-                            ->latest();
-                    },
-                    'mabadiliko' => function ($query) {
-                        $query->with(['user'])->latest();
-                    },
-                ])->where('ofisi_id', $activeOfisiId);
-            },
-            'mikopoAliyodhamini' => function ($loanQuery) use ($activeOfisiId, $customerId) {
-                $loanQuery->with([
-                    'user',
-                    'customers',
-                    'wadhamini',
-                    'dhamana' => function ($query) use ($customerId) {
-                        $query->where('customer_id', $customerId)->latest();
-                    },
-                    'transactions' => function ($query) {
-                        $query->with(['user', 'approver', 'creator', 'customer'])
-                            ->where('status', 'completed')
-                            ->latest();
-                    },
-                    'mabadiliko' => function ($query) {
-                        $query->with(['user'])->latest();
-                    },
-                ])->where('ofisi_id', $activeOfisiId);
-            },
-        ])->findOrFail($customerId);
-
-        // Add position info for loan users in borrowed loans
-        foreach ($customer->loans as $loan) {
-            if ($loan->user) {
-                $loan->user->position_in_active_ofisi = $loan->user->positionInOfisi($activeOfisiId);
+            if (!$user) {
+                throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
             }
-        }
 
-        // Add position info for loan users in guaranteed loans
-        foreach ($customer->mikopoAliyodhamini as $loan) {
-            if ($loan->user) {
-                $loan->user->position_in_active_ofisi = $loan->user->positionInOfisi($activeOfisiId);
+            if (!$user->activeOfisi) {
+                throw new \Exception("Huna ofisi unayoitumia kwa sasa. Piga simu msaada {$helpNumber}");
             }
-        }
 
-        return response()->json([
-            'borrowed_loans' => $customer,
-            'guaranteed_loans' => $customer,
-        ]);
+            $activeOfisiId = $user->activeOfisi->ofisi_id;
+
+            $userOfisi = UserOfisi::where('user_id', $user->id)
+                ->where('ofisi_id', $activeOfisiId)
+                ->first();
+
+            if (!$userOfisi || !$userOfisi->ofisi) {
+                throw new \Exception("Kuna tatizo kwenye usajili wako wa ofisi. Wasiliana na msaada.");
+            }
+
+            $position = Position::find($userOfisi->position_id);
+            if (!$position) {
+                throw new \Exception("Wewe sio kiongozi wa ofisi, huna ruhusa ya kufanya kitendo hiki.");
+            }
+
+            $validator = Validator::make($request->all(), [
+                'mtejaId' => 'required|exists:customers,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['message' => $validator->errors()->first()], 422);
+            }
+
+            $customerId = $request->mtejaId;
+
+            // Load customer with both relationships filtered by office
+            $customer = Customer::with([
+                'loans' => function ($loanQuery) use ($activeOfisiId) {
+                    $loanQuery->with([
+                        'user',
+                        'customers',
+                        'wadhamini',
+                        'dhamana',
+                        'transactions' => function ($query) {
+                            $query->with(['user', 'approver', 'creator', 'customer'])
+                                ->where('status', 'completed')
+                                ->latest();
+                        },
+                        'mabadiliko' => function ($query) {
+                            $query->with(['user'])->latest();
+                        },
+                    ])->where('ofisi_id', $activeOfisiId);
+                },
+                'mikopoAliyodhamini' => function ($loanQuery) use ($activeOfisiId, $customerId) {
+                    $loanQuery->with([
+                        'user',
+                        'customers',
+                        'wadhamini',
+                        'dhamana' => function ($query) use ($customerId) {
+                            $query->where('customer_id', $customerId)->latest();
+                        },
+                        'transactions' => function ($query) {
+                            $query->with(['user', 'approver', 'creator', 'customer'])
+                                ->where('status', 'completed')
+                                ->latest();
+                        },
+                        'mabadiliko' => function ($query) {
+                            $query->with(['user'])->latest();
+                        },
+                    ])->where('ofisi_id', $activeOfisiId);
+                },
+            ])->findOrFail($customerId);
+
+            // Add position info for loan users in borrowed loans
+            foreach ($customer->loans as $loan) {
+                if ($loan->user) {
+                    $loan->user->position_in_active_ofisi = $loan->user->positionInOfisi($activeOfisiId);
+                }
+            }
+
+            // Add position info for loan users in guaranteed loans
+            foreach ($customer->mikopoAliyodhamini as $loan) {
+                if ($loan->user) {
+                    $loan->user->position_in_active_ofisi = $loan->user->positionInOfisi($activeOfisiId);
+                }
+            }
+
+            return response()->json([
+                'borrowed_loans' => $customer,
+                'guaranteed_loans' => $customer,
+            ]);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Mteja hakupatikana kwenye mfumo, jaribu tena'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
+
 
     private function sendNotificationUongozi($messageContent, $ofisiId)
     {

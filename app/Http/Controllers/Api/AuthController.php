@@ -593,16 +593,28 @@ class AuthController extends Controller
 
     public function logWithAccessToken(AuthRequest $request)
     {
-        // Retrieve the user with their active Kikundi details
-        $user = User::where('id', Auth::id())->first();
+        try {
+            // Retrieve the user with their active Kikundi details
+            $user = User::where('id', Auth::id())->first();
 
-        if (!$user) {
-            return response()->json(['message' => 'Uhakiki wa utumishi wako umeshindikana, wasiliana na 0784477999.'], 404);
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Uhakiki wa utumishi wako umeshindikana, wasiliana na 0784477999.'
+                ], 404);
+            }
+
+            return response()->json([
+                'user' => $user,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Kuna hitilafu imetokea. Tafadhali jaribu tena au wasiliana na msaada.',
+                'error' => $e->getMessage() // (Optional) remove in production for security
+            ], 500);
         }
-        return response()->json([
-            'user' => $user,
-        ], 200);
     }
+
 
 
     public function logout(AuthRequest $request)
