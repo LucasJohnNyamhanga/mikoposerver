@@ -11,37 +11,12 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 
-/**
- * App\Models\User
- *
- * @property int $id
- * @property string $mobile
- * @property string $jina_kamili
- * @property string|null $jina_mdhamini
- * @property string|null $simu_mdhamini
- * @property string|null $picha
- * @property string $username
- * @property string $anakoishi
- * @property bool $is_manager
- * @property bool $is_admin
- * @property bool $is_active
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- *
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Ofisi[] $maofisi
- * @property-read \App\Models\Active|null $activeOfisi
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Position[] $positions
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Message[] $sentMessages
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Message[] $receivedMessages
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Customer[] $customer
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Loan[] $loans
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Transaction[] $transactions
- */
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    public function kifurushis()
+    // Relationships
+    public function kifurushis(): BelongsToMany
     {
         return $this->belongsToMany(Kifurushi::class, 'user_kifurushis')
                     ->withPivot(['start_date', 'end_date'])
@@ -55,12 +30,12 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
-    public function ofisis()
+    public function ofisis(): BelongsToMany
     {
         return $this->belongsToMany(Ofisi::class, 'user_ofisis')
-            ->withPivot('status')
-            ->wherePivot('status', 'accepted')
-            ->withTimestamps();
+                    ->withPivot('status')
+                    ->wherePivot('status', 'accepted')
+                    ->withTimestamps();
     }
 
     public function positions(): HasManyThrough
@@ -103,19 +78,6 @@ class User extends Authenticatable
         return $this->hasMany(TransactionChange::class);
     }
 
-    public function positionInOfisi($ofisiId)
-    {
-        $userOfisi = $this->maofisi()
-            ->where('ofisi_id', $ofisiId)
-            ->first();
-
-        if ($userOfisi && $userOfisi->pivot->position_id) {
-            return Position::find($userOfisi->pivot->position_id);
-        }
-
-        return null;
-    }
-
     public function kifurushiPurchases(): HasMany
     {
         return $this->hasMany(KifurushiPurchase::class);
@@ -126,6 +88,21 @@ class User extends Authenticatable
         return $this->hasMany(Payment::class);
     }
 
+    /**
+     * Get the user's position in a given ofisi.
+     */
+    public function positionInOfisi(int $ofisiId): ?Position
+    {
+        $userOfisi = $this->maofisi()
+                         ->where('ofisi_id', $ofisiId)
+                         ->first();
+
+        return $userOfisi && $userOfisi->pivot->position_id
+            ? Position::find($userOfisi->pivot->position_id)
+            : null;
+    }
+
+    // Mass assignable attributes
     protected $fillable = [
         'mobile',
         'jina_kamili',
@@ -140,15 +117,18 @@ class User extends Authenticatable
         'anakoishi',
     ];
 
+    // Hidden attributes for arrays
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            // add casting if needed
-        ];
-    }
+    // Attribute casting
+    protected $casts = [
+        'is_manager' => 'boolean',
+        'is_admin' => 'boolean',
+        'is_active' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
 }

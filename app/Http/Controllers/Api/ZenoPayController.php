@@ -82,7 +82,7 @@ class ZenoPayController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Payment initiated successfully.',
+                'message' => 'Subiri meseji mtandao kukamilisha malipo.',
                 'data' => [
                     'zenopay' => $response,
                     'reference' => $payment->reference,
@@ -97,7 +97,7 @@ class ZenoPayController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to initiate payment. Please try again later.',
+                'message' => 'Malipo yameshindikana kuanzishwa, jaribu tena baadae.',
             ], 500);
         }
     }

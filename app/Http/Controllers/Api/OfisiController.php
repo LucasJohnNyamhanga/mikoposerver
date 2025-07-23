@@ -86,7 +86,9 @@ class OfisiController extends Controller
                         ,'wadhamini','dhamana','mabadiliko'=> function ($query) {
                             $query->latest();
                         }
-                        ])->whereIn('status', ['approved','defaulted',])->latest();
+                        ])
+                        //->whereIn('status', ['approved','defaulted',])
+                        ->latest();
                     },'transactions'=> function ($query) {
                             $query->with([
                                 'user','approver','creator','customer'

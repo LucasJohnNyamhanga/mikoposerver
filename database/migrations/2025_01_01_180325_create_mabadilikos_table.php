@@ -13,14 +13,18 @@ return new class extends Migration
     {
         Schema::create('mabadilikos', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('loan_id');
-            $table->unsignedBigInteger('performed_by');
+
+            // Use foreignId for cleaner and PostgreSQL-compatible foreign keys
+            $table->foreignId('loan_id')->constrained('loans')->onDelete('cascade');
+            $table->foreignId('performed_by')->constrained('users')->onDelete('cascade');
+
             $table->string('action');
             $table->text('description');
             $table->timestamps();
 
-            $table->foreign('loan_id')->references('id')->on('loans')->onDelete('cascade');
-            $table->foreign('performed_by')->references('id')->on('users')->onDelete('cascade');
+            // Optional indexes for frequent queries
+            $table->index('loan_id');
+            $table->index('performed_by');
         });
     }
 

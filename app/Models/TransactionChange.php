@@ -3,37 +3,55 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TransactionChange extends Model
 {
-    public function ofisi()
+    /**
+     * Get the ofisi this transaction change belongs to.
+     */
+    public function ofisi(): BelongsTo
     {
         return $this->belongsTo(Ofisi::class);
     }
 
-    public function transaction()
+    /**
+     * Get the transaction this change belongs to.
+     */
+    public function transaction(): BelongsTo
     {
         return $this->belongsTo(Transaction::class);
     }
 
-    // Relationship: Creator (User who created the transaction)
-    public function creator()
+    /**
+     * Get the user who created this transaction change.
+     */
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    // Relationship: Approver (User who approved the transaction)
-    public function approver()
+    /**
+     * Get the user who approved this transaction change.
+     */
+    public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    // Relationship: User (User who the transaction belongs to or is associated with)
-    public function user()
+    /**
+     * Get the user this transaction change is associated with.
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int,string>
+     */
     protected $fillable = [
         'type',
         'category',
@@ -49,5 +67,17 @@ class TransactionChange extends Model
         'ofisi_id',
         'transaction_id',
         'reason',
+    ];
+
+    /**
+     * Attribute casting.
+     *
+     * @var array<string,string>
+     */
+    protected $casts = [
+        'amount' => 'decimal:2',
+        // Add other casts if needed, for example:
+        // 'status' => 'string',
+        // 'created_at' => 'datetime',
     ];
 }

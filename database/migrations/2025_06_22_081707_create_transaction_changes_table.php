@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -13,32 +14,34 @@ return new class extends Migration
     {
         Schema::create('transaction_changes', function (Blueprint $table) {
             $table->id();
-            $table->enum('type', ['kuweka', 'kutoa'])->nullable();
-            $table->enum('category', ['fomu', 'rejesho','pato', 'tumizi', 'faini', 'mkopo',])->nullable();
-            $table->enum('status', ['pending', 'completed', 'failed','cancelled']);
-            $table->enum('method', ['benki', 'mpesa', 'halopesa','airtelmoney','mix by yas','pesa mkononi'])->nullable();
+
+            // ENUMs replaced with indexed strings for PostgreSQL flexibility
+            $table->string('type', 20)->nullable();          // kuweka, kutoa
+            $table->string('category', 20)->nullable();      // fomu, rejesho, pato, tumizi, faini, mkopo
+            $table->string('status', 20)->default('pending'); // pending, completed, failed, cancelled
+            $table->string('method', 30)->nullable();        // benki, mpesa, halopesa, etc.
             $table->decimal('amount', 20, 2)->nullable();
+
             $table->longText('description')->nullable();
             $table->longText('admin_details')->nullable();
             $table->longText('reason')->nullable();
-            $table->enum('action_type', ['edit', 'delete'])->default('edit');
-            
+            $table->string('action_type', 20)->default('edit'); // edit, delete
+
             // Foreign keys
-            $table->unsignedBigInteger('created_by');
-            $table->unsignedBigInteger('approved_by')->nullable();
-            $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('ofisi_id');
-            $table->unsignedBigInteger('transaction_id');
+            $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
+            $table->foreignId('approved_by')->nullable()->constrained('users')->onDelete('cascade');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('ofisi_id')->constrained('ofisis')->onDelete('cascade');
+            $table->foreignId('transaction_id')->constrained('transactions')->onDelete('cascade');
 
             $table->timestamps();
 
-            // Foreign key constraints
-            $table->foreign('created_by')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('approved_by')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('ofisi_id')->references('id')->on('ofisis')->onDelete('cascade');
-            $table->foreign('transaction_id')->references('id')->on('transactions')->onDelete('cascade');
+            // Composite index for performance
+            $table->index(['user_id', 'status']);
         });
+
+        // Optional: Partial index for pending status (faster lookups)
+        DB::statement("CREATE INDEX transaction_changes_pending_idx ON transaction_changes (user_id) WHERE status = 'pending'");
     }
 
     /**

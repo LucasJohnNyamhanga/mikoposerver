@@ -13,12 +13,19 @@ return new class extends Migration
     {
         Schema::create('actives', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('ofisi_id');
+
+            // Use foreignId for clearer and PostgreSQL-compatible foreign keys
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('ofisi_id')->constrained('ofisis')->onDelete('cascade');
+
             $table->timestamps();
 
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('ofisi_id')->references('id')->on('ofisis')->onDelete('cascade');
+            // Indexes to speed up common queries
+            $table->index('user_id');
+            $table->index('ofisi_id');
+
+            // Optional: unique constraint if a user can only be active once per office
+            $table->unique(['user_id', 'ofisi_id']);
         });
     }
 

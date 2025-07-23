@@ -9,23 +9,31 @@ class UserOfisi extends Model
 {
     protected $table = 'user_ofisis';
 
-    public function position():BelongsTo
+    protected $fillable = [
+        'user_id',
+        'ofisi_id',
+        'position_id',
+        'status',
+        'isActive',
+    ];
+
+    protected $casts = [
+        'isActive' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    public function position(): BelongsTo
     {
         return $this->belongsTo(Position::class);
     }
 
-    /**
-     * Get the user for this KikundiUser.
-     */
-    public function user():BelongsTo
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the Kikundi for this KikundiUser.
-     */
-    public function ofisi():BelongsTo
+    public function ofisi(): BelongsTo
     {
         return $this->belongsTo(Ofisi::class);
     }

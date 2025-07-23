@@ -13,16 +13,26 @@ return new class extends Migration
     {
         Schema::create('user_ofisis', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('ofisi_id');
-            $table->unsignedBigInteger('position_id')->nullable();
-            $table->enum('status', ['pending', 'accepted', 'denied'])->default('pending');
+
+            // Use foreignId for cleaner foreign keys
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('ofisi_id')->constrained('ofisis')->onDelete('cascade');
+            $table->foreignId('position_id')->nullable()->constrained('positions')->nullOnDelete();
+
+            // Replace enum with string for PostgreSQL flexibility
+            $table->string('status', 20)->default('pending'); // pending, accepted, denied
+
             $table->boolean('isActive')->default(false);
             $table->timestamps();
 
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('ofisi_id')->references('id')->on('ofisis')->onDelete('cascade');
-            $table->foreign('position_id')->references('id')->on('positions')->onDelete('set null');
+            // Indexes for performance on common filters
+            $table->index('user_id');
+            $table->index('ofisi_id');
+            $table->index('status');
+            $table->index('isActive');
+
+            // Optional unique constraint if user can only have one position per office
+            // $table->unique(['user_id', 'ofisi_id']);
         });
     }
 

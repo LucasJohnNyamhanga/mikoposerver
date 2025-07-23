@@ -13,16 +13,24 @@ return new class extends Migration
     {
         Schema::create('messages', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('ofisi_id');
-            $table->unsignedBigInteger('sender_id')->nullable();
-            $table->unsignedBigInteger('receiver_id');
+
+            // Foreign keys using foreignId and constrained()
+            $table->foreignId('ofisi_id')->constrained('ofisis')->onDelete('cascade');
+            $table->foreignId('sender_id')->nullable()->constrained('users')->onDelete('cascade');
+            $table->foreignId('receiver_id')->constrained('users')->onDelete('cascade');
+
             $table->longText('message');
-            $table->enum('status', ['unread', 'read'])->default('unread');
+
+            // Replace enum with string for PostgreSQL flexibility
+            $table->string('status', 10)->default('unread'); // 'unread', 'read'
+
             $table->timestamps();
 
-            $table->foreign('ofisi_id')->references('id')->on('ofisis')->onDelete('cascade');
-            $table->foreign('sender_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('receiver_id')->references('id')->on('users')->onDelete('cascade');
+            // Indexes for common queries
+            $table->index('ofisi_id');
+            $table->index('sender_id');
+            $table->index('receiver_id');
+            $table->index('status');
         });
     }
 

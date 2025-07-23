@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
+
             $table->string('jina');
             $table->string('jinaMaarufu');
             $table->string('jinsia');
@@ -20,11 +21,16 @@ return new class extends Migration
             $table->string('simu')->unique();
             $table->string('kazi');
             $table->string('picha');
+
+            // Foreign keys
+            $table->foreignId('ofisi_id')->constrained('ofisis')->onDelete('cascade');
+            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
+
             $table->timestamps();
-            $table->foreignId('ofisi_id');
-            $table->foreign('ofisi_id')->references('id')->on('ofisis')->onDelete('cascade');
-            $table->foreignId('user_id')->nullable(); //in case afisa amefutwa
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+
+            // Indexes to speed up common queries
+            $table->index('ofisi_id');
+            $table->index('user_id');
         });
     }
 
