@@ -96,7 +96,7 @@ class TransactionChangeController extends Controller
                 'type' => $transaction->type,
                 'category' => $transaction->category,
                 'status' => 'pending',
-                'method' => $request->method,
+                'method' => $request->get('method'),
                 'amount' => $request->amount,
                 'description' => $request->description,
                 'created_by' => $user->id,
