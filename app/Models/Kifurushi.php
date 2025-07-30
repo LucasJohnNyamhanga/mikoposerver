@@ -25,6 +25,7 @@ class Kifurushi extends Model
         'duration_in_days',
         'price',
         'is_active',
+        'offer',
     ];
 
     protected $casts = [

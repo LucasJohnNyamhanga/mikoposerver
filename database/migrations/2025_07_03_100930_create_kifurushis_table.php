@@ -22,6 +22,7 @@ return new class extends Migration
 
             $table->decimal('price', 10, 2)->default(0);  // Price field
             $table->boolean('is_active')->default(true);  // Indicates if package is active
+            $table->text('offer')->nullable();
             $table->timestamps();
 
             // Index to quickly filter active packages
