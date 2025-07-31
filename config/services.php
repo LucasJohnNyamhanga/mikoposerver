@@ -14,9 +14,17 @@ return [
     |
     */
 
-    
+
     'zenopay' => [
         'token' => env('ZENOPAY_API_KEY'),
+    ],
+
+    'app' => [
+        'name' => env('APP_NAME'),
+    ],
+
+    'help' => [
+        'number' => env('APP_HELP'),
     ],
 
 

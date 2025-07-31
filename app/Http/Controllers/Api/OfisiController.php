@@ -12,6 +12,7 @@ use App\Models\Ofisi;
 use App\Models\Position;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\OfisiService;
 use Carbon\Carbon;
 use App\Models\UserOfisi;
 use Illuminate\Support\Facades\Validator;
@@ -43,28 +44,17 @@ class OfisiController extends Controller
         return response()->json(['ofisi' => $ofisi], 200);
     }
 
-    public function getOfisiData(OfisiRequest $request)
+    public function getOfisiData(OfisiRequest $request, OfisiService $ofisiService)
     {
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
+        }
+
         $user = Auth::user();
 
-        if (!$user) {
-            // Return error if user is not found
-            return response()->json(['message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'], 401);
-        }
-
-        // Check if the user has an active ofisi
-        if (!$user->activeOfisi) {
-            return response()->json(['message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'], 401);
-        }
-        // Retrieve the KikundiUser record to get the position and the Kikundi details
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-                            ->first();
-
-        $ofisi = $userOfisi->ofisi;
-
         $this->updateLoanStatuses($ofisi->id);//its working
-        
+
         $ofisiYangu = Ofisi::with(['users'=> function ($query) {
                 $query->with(['receivedMessages' => function ($query) {
                             $query->with(['sender', 'receiver'])
@@ -103,27 +93,12 @@ class OfisiController extends Controller
         ], 200);
     }
 
-    public function getMapato(OfisiRequest $request)
+    public function getMapato(OfisiRequest $request, OfisiService $ofisiService)
     {
-        $user = Auth::user();
-
-        if (!$user) {
-            return response()->json([
-                'message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'
-            ], 401);
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
         }
-
-        if (!$user->activeOfisi) {
-            return response()->json([
-                'message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'
-            ], 401);
-        }
-
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-            ->first();
-
-        $ofisi = $userOfisi->ofisi;
 
         $validator = Validator::make($request->all(), [
             'startDate' => 'required|date',
@@ -155,27 +130,12 @@ class OfisiController extends Controller
         ], 200);
     }
 
-    public function getMatumizi(OfisiRequest $request)
+    public function getMatumizi(OfisiRequest $request, OfisiService $ofisiService)
     {
-        $user = Auth::user();
-
-        if (!$user) {
-            return response()->json([
-                'message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'
-            ], 401);
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
         }
-
-        if (!$user->activeOfisi) {
-            return response()->json([
-                'message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'
-            ], 401);
-        }
-
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-            ->first();
-
-        $ofisi = $userOfisi->ofisi;
 
         $validator = Validator::make($request->all(), [
             'startDate' => 'required|date',
@@ -208,8 +168,13 @@ class OfisiController extends Controller
     }
 
 
-    public function getUserOfisiSummary(): JsonResponse
+    public function getUserOfisiSummary(OfisiService $ofisiService): JsonResponse
     {
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
+        }
+
         $userId = Auth::id();
 
         $user = User::with(['ofisis' => function ($query) {
@@ -252,9 +217,13 @@ class OfisiController extends Controller
         return response()->json($ofisis);
     }
 
-    public function getMwamala(OfisiRequest $request)
+    public function getMwamala(OfisiRequest $request, OfisiService $ofisiService)
     {
         $user = Auth::user();
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
+        }
 
         if (!$user) {
             return response()->json([
@@ -301,28 +270,12 @@ class OfisiController extends Controller
 
 
 
-    public function badiliUshirika(OfisiRequest $request)
+    public function badiliUshirika(OfisiRequest $request, OfisiService $ofisiService)
     {
-        $user = Auth::user();
-        $helpNumber = env('APP_HELP');
-        $appName = env('APP_NAME');
-
-        if (!$user) {
-            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
         }
-
-        if (!$user->activeOfisi) {
-            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
-        }
-
-        // Retrieve the KikundiUser record to get the position and the Kikundi details
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-                            ->first();
-
-        $ofisi = $userOfisi->ofisi;
-
-        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
 
         $position = $ofisi->pivot->position_id;
 
@@ -366,18 +319,12 @@ class OfisiController extends Controller
         ], 200);
     }
 
-    public function badiliOfisi(OfisiRequest $request)
+    public function badiliOfisi(OfisiRequest $request, OfisiService $ofisiService)
     {
         $user = Auth::user();
-        $helpNumber = env('APP_HELP');
-        $appName = env('APP_NAME');
-
-        if (!$user) {
-            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
-        }
-
-        if (!$user->activeOfisi) {
-            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
         }
 
         $validator = Validator::make($request->all(), [
@@ -411,28 +358,14 @@ class OfisiController extends Controller
         ], 200);
     }
 
-    public function sajiliOfisiBilaUser(OfisiRequest $request)
+    public function sajiliOfisiBilaUser(OfisiRequest $request, OfisiService $ofisiService)
     {
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
+        }
+
         $user = Auth::user();
-        $helpNumber = env('APP_HELP');
-
-        if (!$user) {
-            throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
-        }
-
-        if (!$user->activeOfisi) {
-            throw new \Exception("Huna ofisi inayotumika kwa sasa. Piga simu msaada {$helpNumber}");
-        }
-
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-                            ->first();
-
-        if (!$userOfisi) {
-            throw new \Exception("Hatukuweza kupata usajili wako kwenye ofisi hiyo.");
-        }
-
-        $ofisi = $user->maofisi->where('id', $userOfisi->ofisi_id)->first();
 
         if (!$ofisi || !$ofisi->pivot->position_id) {
             throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
@@ -495,28 +428,13 @@ class OfisiController extends Controller
         ], 200);
     }
 
-    public function jiungeOfisiBilaUser(OfisiRequest $request)
+    public function jiungeOfisiBilaUser(OfisiRequest $request, OfisiService $ofisiService)
     {
         $user = Auth::user();
-        $helpNumber = env('APP_HELP');
-
-        if (!$user) {
-            throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
         }
-
-        if (!$user->activeOfisi) {
-            throw new \Exception("Huna ofisi inayotumika kwa sasa. Piga simu msaada {$helpNumber}");
-        }
-
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-                            ->first();
-
-        if (!$userOfisi) {
-            throw new \Exception("Hatukuweza kupata usajili wako kwenye ofisi hiyo.");
-        }
-
-        $ofisi = $user->maofisi->where('id', $userOfisi->ofisi_id)->first();
 
         if (!$ofisi || !$ofisi->pivot->position_id) {
             throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
@@ -583,27 +501,17 @@ class OfisiController extends Controller
         ], 200);
     }
 
-    public function getOfisiUsersWithDetails()
+    public function getOfisiUsersWithDetails(OfisiService $ofisiService)
     {
         $user = Auth::user();
-        $helpNumber = env('APP_HELP');
-
-        if (!$user) {
-            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
         }
 
-        if (!$user->activeOfisi) {
-            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
-        }
+        $ofisiId = $ofisi->id;
 
-        $ofisiId = $user->activeOfisi->ofisi_id;
-
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-                        ->where('ofisi_id', $ofisiId)
-                        ->first();
-
-        $position = Position::find($userOfisi?->position_id);
-
+        $position = $ofisi->pivot->position_id;
         if (!$position) {
             throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona watumishi wa ofisi na utendaji wao.");
         }
@@ -628,7 +536,6 @@ class OfisiController extends Controller
             },
         ])
         ->get();
-    
 
         $data = $users->map(function ($u) {
             $pivot = $u->maofisi->first()?->pivot;
@@ -719,31 +626,17 @@ class OfisiController extends Controller
         ], 200);
     }
 
-    public function futaMtumishi(OfisiRequest $request)
+    public function futaMtumishi(OfisiRequest $request, OfisiService $ofisiService)
     {
         $user = Auth::user();
-        $helpNumber = env('APP_HELP');
-
-        if (!$user) {
-            throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
         }
 
-        $activeOfisi = $user->activeOfisi;
+        $position = $ofisi->pivot->position_id;
 
-        if (!$activeOfisi) {
-            throw new \Exception("Kuna tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
-        }
-
-        // Get user position in the current office
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-                            ->where('ofisi_id', $activeOfisi->ofisi_id)
-                            ->first();
-
-        if (!$userOfisi || !$userOfisi->ofisi) {
-            throw new \Exception("Hatukuweza kupata taarifa za ofisi yako kikamilifu.");
-        }
-
-        $positionRecord = Position::find($userOfisi->position_id);
+        $positionRecord = Position::find($position);
 
         if (!$positionRecord) {
             throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
@@ -763,7 +656,7 @@ class OfisiController extends Controller
 
         // Find target user within the same office
         $targetUserOfisi = UserOfisi::where('user_id', $request->userId)
-                                    ->where('ofisi_id', $userOfisi->ofisi_id)
+                                    ->where('ofisi_id', $ofisi->id)
                                     ->first();
 
         if (!$targetUserOfisi) {
@@ -782,32 +675,19 @@ class OfisiController extends Controller
         ], 200);
     }
 
-    public function badiliCheo(OfisiRequest $request)
+    public function badiliCheo(OfisiRequest $request, OfisiService $ofisiService)
     {
-        $user = Auth::user();
-        $helpNumber = env('APP_HELP');
 
-        if (!$user) {
-            throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+            return $ofisi;
         }
 
-        $activeOfisi = $user->activeOfisi;
+        $position = $ofisi->pivot->position_id;
 
-        if (!$activeOfisi) {
-            throw new \Exception("Kuna tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
-        }
+        $positionRecord = Position::find($position);
 
-        $userOfisi = UserOfisi::where([
-            'user_id' => $user->id,
-            'ofisi_id' => $activeOfisi->ofisi_id,
-        ])->first();
-
-        if (!$userOfisi || !$userOfisi->ofisi) {
-            throw new \Exception("Hatukuweza kupata taarifa za ofisi yako kikamilifu.");
-        }
-
-        // Check if user has a valid position (is a leader)
-        if (!Position::find($userOfisi->position_id)) {
+        if (!$positionRecord) {
             throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
         }
 
@@ -827,7 +707,7 @@ class OfisiController extends Controller
         // Check if target user is in the same office
         $targetUserOfisi = UserOfisi::where([
             'user_id' => $request->userId,
-            'ofisi_id' => $userOfisi->ofisi_id,
+            'ofisi_id' => $ofisi->id,
         ])->first();
 
         if (!$targetUserOfisi) {

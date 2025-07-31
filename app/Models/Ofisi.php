@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Ofisi extends Model
 {
+    public mixed $pivot;
+
     public function users():BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_ofisis')->latest()
@@ -23,10 +25,10 @@ class Ofisi extends Model
     {
         return $this->belongsToMany(User::class, 'user_ofisis')
                     ->withPivot('status')
-                    ->wherePivot('status', 'accepted'); 
+                    ->wherePivot('status', 'accepted');
     }
 
-    public function userOfisis()
+    public function userOfisis(): Ofisi|HasMany
     {
         return $this->hasMany(UserOfisi::class);
     }
@@ -53,12 +55,12 @@ class Ofisi extends Model
         return $this->hasMany(Customer::class);
     }
 
-    public function loans()
+    public function loans(): Ofisi|HasMany
     {
         return $this->hasMany(Loan::class);
     }
 
-    public function transactions()
+    public function transactions(): Ofisi|HasMany
     {
         return $this->hasMany(Transaction::class);
     }
@@ -81,7 +83,7 @@ class Ofisi extends Model
         return $this->hasMany(Aina::class);
     }
 
-    public function dhamana()
+    public function dhamana(): Ofisi|HasMany
     {
         return $this->hasMany(Dhamana::class);
     }

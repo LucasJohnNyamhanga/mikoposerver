@@ -10,20 +10,25 @@ use App\Models\Message;
 use App\Models\Ofisi;
 use App\Models\Position;
 use App\Models\Transaction;
-use App\Models\UserOfisi;
+use App\Services\OfisiService;
 use Carbon\Carbon;
+use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule as ValidationRule;
 use App\Services\LoanService;
+use Throwable;
 
 class MiamalaController extends Controller
 {
-    public function lipiaRejesho(MiamalaRequest $request)
+    public function lipiaRejesho(MiamalaRequest $request, OfisiService $ofisiService)
     {
-        // Validate input
-        $validator = Validator::make($request->all(), [
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) return $ofisi;
+
+        $data = $request->validate([
             'type' => 'required|string|max:255',
             'category' => 'required|string|max:255',
             'status' => 'required|string|max:255',
@@ -35,88 +40,71 @@ class MiamalaController extends Controller
             'mtejaId' => 'required|exists:customers,id',
         ]);
 
-        if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()->first()], 422);
-        }
-
-        DB::beginTransaction();
-
         try {
-            $ofisi = Ofisi::findOrFail($request->ofisiId);
+            DB::beginTransaction();
+
             $user = Auth::user();
+            $appName = config('services.app.name');
+            $helpNumber = config('services.help.number');
 
-            $appName = env('APP_NAME');
-            $helpNumber = env('APP_HELP');
+            $loan = Loan::findOrFail($data['loanId']);
 
-            // 1. Retrieve the loan
-            $loan = Loan::findOrFail($request->loanId);
-
-            // 2. Ensure loan status is valid
             if (!in_array($loan->status, ['approved', 'defaulted'])) {
                 return response()->json([
                     'message' => 'Mkopo huu haujaruhusiwa kwa marejesho.'
                 ], 400);
             }
 
-            // 3. Calculate total repayment so far
             $totalRejesho = Transaction::where('loan_id', $loan->id)
                 ->where('category', 'rejesho')
                 ->sum('amount');
 
-            // 4. Compute remaining balance
-            $remainingBalance = $loan->total_due - $totalRejesho;
+            $remaining = $loan->total_due - $totalRejesho;
 
-            // 5. Prevent overpayment
-            if ($request->amount > $remainingBalance) {
+            if ($data['amount'] > $remaining) {
                 return response()->json([
-                    'message' => "Rejesho limepita kiasi kilichobaki. Tafadhari lipa Tsh " . number_format($remainingBalance) . "."
+                    'message' => "Rejesho limezidi kiasi kilichobaki. Tafadhali lipa kiasi kisichozidi Tsh " . number_format($remaining) . "."
                 ], 400);
             }
 
-            // 6. Create the transaction record
             $transaction = Transaction::create([
-                'type' => $request->type,
-                'category' => $request->category,
-                'status' => $request->status,
-                'method' => $request->get('method'),
-                'amount' => $request->amount,
-                'description' => $request->description,
+                'type' => $data['type'],
+                'category' => $data['category'],
+                'status' => $data['status'],
+                'method' => $data['method'],
+                'amount' => $data['amount'],
+                'description' => $data['description'],
                 'created_by' => $user->id,
                 'user_id' => $user->id,
                 'approved_by' => $user->id,
-                'ofisi_id' => $ofisi->id,
-                'loan_id' => $request->loanId,
-                'customer_id' => $request->mtejaId,
+                'ofisi_id' => $data['ofisiId'],
+                'loan_id' => $data['loanId'],
+                'customer_id' => $data['mtejaId'],
             ]);
 
-            // 7. Check if loan is now fully repaid
-            $totalRejesho += $request->amount; // Add current payment
-            if ($totalRejesho >= $loan->total_due) {
-                $loan->status = 'repaid';
-                $loan->save();
+            $newTotal = $totalRejesho + $data['amount'];
+
+            if ($newTotal >= $loan->total_due) {
+                $loan->update(['status' => 'repaid']);
             }
 
-            // 8. Get loan customer names
-            $customers = Customer::whereIn(
+            $customerNames = Customer::whereIn(
                 'id',
-                DB::table('loan_customers')
-                    ->where('loan_id', $request->loanId)
-                    ->pluck('customer_id')
+                DB::table('loan_customers')->where('loan_id', $data['loanId'])->pluck('customer_id')
             )->pluck('jina');
 
-            $names = $this->formatCustomerNames($customers);
+            $names = $this->formatCustomerNames($customerNames);
 
-            // 9. Send notifications
             $this->sendNotification(
-                "Hongera, rejesho la Tsh {$request->amount} la mkopo wa {$names} limepokelewa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Hongera, rejesho la Tsh {$data['amount']} la mkopo wa $names limepokelewa. Asante kwa kutumia $appName, kwa msaada piga simu namba $helpNumber.",
                 $user->id,
                 null,
-                $ofisi->id
+                $data['ofisiId']
             );
 
             $this->sendNotificationKwaViongoziWengine(
-                "Rejesho la Tsh {$request->amount} la mkopo wa {$names} limepokelewa na mtumishi {$user->jina_kamili} mwenye simu namba {$user->mobile}, wateja wa mkopo huo ni {$names}. Asante kwa kutumia mfumo wa Mikopo Center.",
-                $ofisi->id,
+                "Rejesho la Tsh {$data['amount']} la mkopo wa $names limepokelewa na mtumishi $user->jina_kamili mwenye simu namba $user->mobile, wateja wa mkopo huo ni $names. Asante kwa kutumia mfumo wa Mikopo Center.",
+                $data['ofisiId'],
                 $user->id
             );
 
@@ -125,10 +113,19 @@ class MiamalaController extends Controller
             return response()->json([
                 'message' => 'Rejesho limepokelewa kikamilifu.',
                 'transaction' => $transaction
-            ], 200);
+            ]);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
+        } catch (Throwable  $e) {
+            try{
+                DB::rollBack();
+            }
+            catch (Throwable $e){
+                return response()->json([
+                    'error' => 'Rejesho limeshindikana kupokelewa.',
+                    'message' => $e->getMessage()
+                ], 500);
+            }
+
             return response()->json([
                 'error' => 'Rejesho limeshindikana kupokelewa.',
                 'message' => $e->getMessage()
@@ -137,8 +134,15 @@ class MiamalaController extends Controller
     }
 
 
-    public function lipiaFaini(MiamalaRequest $request)
+
+    public function lipiaFaini(MiamalaRequest $request, OfisiService $ofisiService)
     {
+
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) {
+            return $ofisi;
+        }
+
         // Validate input
         $validator = Validator::make($request->all(), [
             'type' => 'required|string|max:255',
@@ -155,15 +159,24 @@ class MiamalaController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        DB::beginTransaction();
+
 
         try {
+
             $ofisi = Ofisi::findOrFail($request->ofisiId); // Ensure the office exists
             $user = Auth::user();
 
-            $appName = env('APP_NAME');
-            $helpNumber = env('APP_HELP');
+            $appName = config('services.app.name');
+            $helpNumber = config('services.help.number');
 
+            try {
+                DB::beginTransaction();
+            } catch (Throwable $e) {
+                return response()->json([
+                    'error' => 'Faini imeshindikana kupokelewa.',
+                    'message' => $e->getMessage()
+                ], 500);
+            }
             // Create the transaction record
             Transaction::create([
                 'type' => $request->type,
@@ -192,67 +205,71 @@ class MiamalaController extends Controller
             // Respond based on loan type
             if (!$loanExisting) {
                 $message = 'Mteja hana mkopo wowote unaoendelea.';
-                throw new \Exception("{$message}");
+                throw new Exception("$message");
             }
 
             // Send notifications
             $this->sendNotification(
-                "Imethibitishwa faini ya Tsh {$request->amount} ya mteja {$mteja->jina} imepokelewa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Imethibitishwa faini ya Tsh $request->amount ya mteja $mteja->jina imepokelewa. Asante kwa kutumia $appName, kwa msaada piga simu namba $helpNumber.",
                 $user->id,
                 null,
                 $ofisi->id
             );
 
             $this->sendNotificationKwaViongoziWengine(
-                "Imethibitishwa faini ya Tsh {$request->amount} ya mteja {$mteja->jina} imepokelewa kwa sababu ya {$request->description} na afisa {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Imethibitishwa faini ya Tsh $request->amount ya mteja $mteja->jina imepokelewa kwa sababu ya $request->description na afisa $user->jina_kamili mwenye namba $user->mobile. Asante kwa kutumia $appName, kwa msaada piga simu namba $helpNumber.",
                 $ofisi->id,
                 $user->id
             );
 
-            DB::commit();
+            try {
+                DB::commit();
+            } catch (Throwable $e) {
+                return response()->json([
+                    'error' => 'Faini imeshindikana kupokelewa.',
+                    'message' => $e->getMessage()
+                ], 500);
+            }
 
             return response()->json([
                 'message' => 'Faini imepokelewa kikamilifu.',
-            ], 200);
+            ]);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
+        } catch (Exception $e) {
+            try {
+                DB::rollBack();
+            } catch (Throwable $e) {
+                return response()->json([
+                    'error' => 'Faini imeshindikana kupokelewa.',
+                    'message' => $e->getMessage()
+                ], 500);
+            }
             return response()->json([
                 'error' => 'Faini imeshindikana kupokelewa.',
                 'message' => $e->getMessage()
             ], 500);
+
         }
     }
 
-    public function sajiliPato(MiamalaRequest $request)
+    public function sajiliPato(MiamalaRequest $request, OfisiService $ofisiService)
     {
+        $appName = config('services.app.name');
+        $helpNumber = config('services.help.number');
+
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) {
+            return $ofisi;
+        }
+
         $user = Auth::user();
-        $helpNumber = env('APP_HELP');
-        $appName = env('APP_NAME');
-
-        if (!$user) {
-            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
-        }
-
-        if (!$user->activeOfisi) {
-            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
-        }
-
-        // Retrieve the KikundiUser record to get the position and the Kikundi details
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-                            ->first();
-
-        $ofisi = $userOfisi->ofisi;
-
-        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
 
         $position = $ofisi->pivot->position_id;
 
         $positionRecord = Position::find($position);
 
         if (!$positionRecord) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili pato.");
+            throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili pato.");
         }
 
         $cheo = $positionRecord->name;
@@ -289,9 +306,17 @@ class MiamalaController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        DB::beginTransaction();
+
 
         try {
+            try {
+                DB::beginTransaction();
+            } catch (Throwable $e) {
+                return response()->json([
+                    'error' => 'Pato limeshindikana kupokelewa.',
+                    'message' => $e->getMessage()
+                ], 500);
+            }
             // Create the transaction record
             Transaction::create([
                 'type' => $request->type,
@@ -310,14 +335,14 @@ class MiamalaController extends Controller
 
             // Send notifications
             $this->sendNotification(
-                "Imethibitishwa pato la Tsh {$request->amount} limepokelewa kwa ajili ya {$request->description}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Imethibitishwa pato la Tsh $request->amount limepokelewa kwa ajili ya $request->description. Asante kwa kutumia $appName, kwa msaada piga simu namba $helpNumber.",
                 $user->id,
                 null,
                 $ofisi->id
             );
 
             $this->sendNotificationKwaViongoziWengine(
-                "Imethibitishwa pato la Tsh {$request->amount} limepokelewa kwa ajili ya {$request->description} na kuwekwa na {$cheo} {$user->jina_kamili} mwenye namba {$user->mobile}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
+                "Imethibitishwa pato la Tsh $request->amount limepokelewa kwa ajili ya $request->description na kuwekwa na $cheo $user->jina_kamili mwenye namba $user->mobile. Asante kwa kutumia $appName, kwa msaada piga simu namba $helpNumber.",
                 $ofisi->id,
                 $user->id
             );
@@ -328,7 +353,7 @@ class MiamalaController extends Controller
                 'message' => 'Pato limepokelewa kikamilifu.',
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return response()->json([
                 'error' => 'Pato limeshindikana kupokelewa.',
@@ -337,35 +362,23 @@ class MiamalaController extends Controller
         }
     }
 
-    public function sajiliTumizi(MiamalaRequest $request)
+    public function sajiliTumizi(MiamalaRequest $request, OfisiService $ofisiService)
     {
+        $appName = config('services.app.name');
+        $helpNumber = config('services.help.number');
         $user = Auth::user();
-        $helpNumber = env('APP_HELP');
-        $appName = env('APP_NAME');
 
-        if (!$user) {
-            throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) {
+            return $ofisi;
         }
-
-        if (!$user->activeOfisi) {
-            throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
-        }
-
-        // Retrieve the KikundiUser record to get the position and the Kikundi details
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-                            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-                            ->first();
-
-        $ofisi = $userOfisi->ofisi;
-
-        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
 
         $position = $ofisi->pivot->position_id;
 
         $positionRecord = Position::find($position);
 
         if (!$positionRecord) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili tumizi.");
+            throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili tumizi.");
         }
 
         $cheo = $positionRecord->name;
@@ -441,7 +454,7 @@ class MiamalaController extends Controller
                 'message' => 'Tumizi limesajiliwa kikamilifu.',
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return response()->json([
                 'error' => 'Tumizi limeshindikana kupokelewa.',
@@ -450,36 +463,19 @@ class MiamalaController extends Controller
         }
     }
 
-    public function getMarekebishoMiamala(MiamalaRequest $request)
+    public function getMarekebishoMiamala(MiamalaRequest $request, OfisiService $ofisiService)
     {
-        $user = Auth::user();
-
-        if (!$user) {
-            return response()->json([
-                'message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'
-            ], 401);
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) {
+            return $ofisi;
         }
-
-        if (!$user->activeOfisi) {
-            return response()->json([
-                'message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'
-            ], 401);
-        }
-
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-            ->first();
-
-        $ofisi = $userOfisi->ofisi;
-
-        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
 
         $position = $ofisi->pivot->position_id;
 
         $positionRecord = Position::find($position);
 
         if (!$positionRecord) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.");
+            throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.");
         }
 
         $miamala = Transaction::with(['user', 'approver', 'creator', 'customer', 'transactionChanges'])
@@ -496,36 +492,19 @@ class MiamalaController extends Controller
         ], 200);
     }
 
-    public function getMiamalaByDay(MiamalaRequest $request, LoanService $loanService)
+    public function getMiamalaByDay(MiamalaRequest $request, LoanService $loanService, OfisiService $ofisiService)
     {
-        $user = Auth::user();
-
-        if (!$user) {
-            return response()->json([
-                'message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'
-            ], 401);
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) {
+            return $ofisi;
         }
-
-        if (!$user->activeOfisi) {
-            return response()->json([
-                'message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'
-            ], 401);
-        }
-
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-            ->first();
-
-        $ofisi = $userOfisi->ofisi;
-
-        $ofisi = $user->maofisi->where('id', $ofisi->id)->first();
 
         $position = $ofisi->pivot->position_id;
 
         $positionRecord = Position::find($position);
 
         if (!$positionRecord) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.");
+            throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.");
         }
 
         $openBalance = Transaction::where('ofisi_id', $ofisi->id)
@@ -559,21 +538,13 @@ class MiamalaController extends Controller
         ], 200);
     }
 
-    public function getMiamalaByDates(MiamalaRequest $request, LoanService $loanService)
+    public function getMiamalaByDates(MiamalaRequest $request, LoanService $loanService, OfisiService $ofisiService)
     {
-        $user = Auth::user();
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) {
+            return $ofisi;
+        }
 
-        abort_if(!$user, 401, 'Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga msaada 0784477999');
-
-        $activeOfisi = $user->activeOfisi;
-        abort_if(!$activeOfisi, 401, 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999');
-
-        $userOfisi = UserOfisi::where([
-            'user_id' => $user->id,
-            'ofisi_id' => $activeOfisi->ofisi_id
-        ])->first();
-
-        $ofisi = $user->maofisi->firstWhere('id', $userOfisi->ofisi_id);
         $positionId = optional($ofisi->pivot)->position_id;
         $positionRecord = Position::find($positionId);
 
