@@ -18,11 +18,16 @@ use App\Models\UserOfisi;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 
 class OfisiController extends Controller
 {
+    public ?User $auth_user = null;
+    public function __construct()
+    {
+        $this->auth_user = Auth::user();
+    }
+
     public function getOfisiByLocation(OfisiRequest $request)
     {
         $validator = Validator::make($request->all(), [
@@ -41,17 +46,17 @@ class OfisiController extends Controller
 
         $ofisi = Ofisi::where('mkoa',$mkoa)->where('wilaya',$wilaya)->where('kata',$kata)->get();
 
-        return response()->json(['ofisi' => $ofisi], 200);
+        return response()->json(['ofisi' => $ofisi]);
     }
 
-    public function getOfisiData(OfisiRequest $request, OfisiService $ofisiService)
+    public function getOfisiData( OfisiService $ofisiService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
-        $user = Auth::user();
+        $user = $this->auth_user;
 
         $this->updateLoanStatuses($ofisi->id);//its working
 
@@ -90,13 +95,13 @@ class OfisiController extends Controller
         return response()->json([
         'user_id' => $user->id,
         'ofisi' => $ofisiYangu,
-        ], 200);
+        ]);
     }
 
     public function getMapato(OfisiRequest $request, OfisiService $ofisiService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
@@ -127,13 +132,13 @@ class OfisiController extends Controller
 
         return response()->json([
             'mapato' => $miamala,
-        ], 200);
+        ]);
     }
 
     public function getMatumizi(OfisiRequest $request, OfisiService $ofisiService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
@@ -164,40 +169,44 @@ class OfisiController extends Controller
 
         return response()->json([
             'matumizi' => $miamala,
-        ], 200);
+        ]);
     }
 
 
     public function getUserOfisiSummary(OfisiService $ofisiService): JsonResponse
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
-        $userId = Auth::id();
+        $userId = $this->auth_user->id;
 
-        $user = User::with(['ofisis' => function ($query) {
-            $query->withCount('customers')
-                ->withCount([
-                    'acceptedUsers as users_count',
-                ])
-                ->withCount([
-                    'loans as active_loans_count' => function ($q) {
-                        $q->whereIn('status', ['approved', 'defaulted']);
-                    }
-                ])
-                ->withSum([
-                    'loans as total_amount_loaned' => function ($q) {
-                        $q->whereIn('status', ['approved', 'defaulted']);
-                    }
-                ], 'amount')
-                ->withSum([
-                    'loans as amount_defaulted' => function ($q) {
-                        $q->where('status', 'defaulted');
-                    }
-                ], 'amount');
-        }])->findOrFail($userId);
+        $user = User::with([
+            'ofisis' => function ($query) {
+                $query
+                    ->select('ofisis.*')
+                    ->withCount('customers')
+                    ->withCount([
+                        'acceptedUsers as users_count',
+                    ])
+                    ->withCount([
+                        'loans as active_loans_count' => function ($q) {
+                            $q->whereIn('status', ['approved', 'defaulted']);
+                        }
+                    ])
+                    ->withSum([
+                        'loans as total_amount_loaned' => function ($q) {
+                            $q->whereIn('status', ['approved', 'defaulted']);
+                        }
+                    ], 'amount')
+                    ->withSum([
+                        'loans as amount_defaulted' => function ($q) {
+                            $q->where('status', 'defaulted');
+                        }
+                    ], 'amount');
+            }
+        ])->findOrFail($userId);
 
         $ofisis = $user->ofisis->map(function ($ofisi) {
             return [
@@ -211,6 +220,7 @@ class OfisiController extends Controller
                 'active_loans_count' => $ofisi->active_loans_count,
                 'total_amount_loaned' => (float) $ofisi->total_amount_loaned,
                 'amount_defaulted' => (float) $ofisi->amount_defaulted,
+                'position_id' => $ofisi->pivot?->position_id,
             ];
         });
 
@@ -219,29 +229,10 @@ class OfisiController extends Controller
 
     public function getMwamala(OfisiRequest $request, OfisiService $ofisiService)
     {
-        $user = Auth::user();
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
-
-        if (!$user) {
-            return response()->json([
-                'message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'
-            ], 401);
-        }
-
-        if (!$user->activeOfisi) {
-            return response()->json([
-                'message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'
-            ], 401);
-        }
-
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-            ->first();
-
-        $ofisi = $userOfisi->ofisi; //use ofisi->id compare it to ofisi_id of transaction, reject if not the same ofisi
 
         $validator = Validator::make($request->all(), [
             'mwamalaId' => 'required|integer|exists:transactions,id',
@@ -265,7 +256,7 @@ class OfisiController extends Controller
 
         return response()->json([
             'mwamala' => $transaction,
-        ], 200);
+        ]);
     }
 
 
@@ -273,19 +264,17 @@ class OfisiController extends Controller
     public function badiliUshirika(OfisiRequest $request, OfisiService $ofisiService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
-        $position = $ofisi->pivot->position_id;
+        $cheoModel = $this->auth_user->getCheoKwaOfisi($ofisi->id);
 
-        $positionRecord = Position::find($position);
-
-        if (!$positionRecord) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+        if (!$cheoModel) {
+            return response()->json([
+                'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.',
+            ], 400);
         }
-
-        $cheo = $positionRecord->name;
 
         // Validate input
         $validator = Validator::make($request->all(), [
@@ -316,14 +305,14 @@ class OfisiController extends Controller
 
         return response()->json([
             'message' => 'Mabadiliko ya ushirika yamefanikiwa',
-        ], 200);
+        ]);
     }
 
     public function badiliOfisi(OfisiRequest $request, OfisiService $ofisiService)
     {
-        $user = Auth::user();
+        $user = $this->auth_user;
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
@@ -354,26 +343,25 @@ class OfisiController extends Controller
         $updatedOfisi = Ofisi::find($request->ofisiId);
 
         return response()->json([
-            'message' => "Umefanikiwa kubadili kwenda ofisi ya {$updatedOfisi->jina}.",
-        ], 200);
+            'message' => "Umefanikiwa kubadili kwenda ofisi ya $updatedOfisi->jina.",
+        ]);
     }
 
     public function sajiliOfisiBilaUser(OfisiRequest $request, OfisiService $ofisiService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
-        $user = Auth::user();
+        $user = $this->auth_user;
 
-        if (!$ofisi || !$ofisi->pivot->position_id) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
-        }
+        $cheoModel = $user->getCheoKwaOfisi($ofisi->id);
 
-        $position = Position::find($ofisi->pivot->position_id);
-        if (!$position) {
-            throw new \Exception("Cheo chako hakijapatikana. Tafadhali wasiliana na msaada.");
+        if (!$cheoModel) {
+            return response()->json([
+                'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.',
+            ], 400);
         }
 
         $validator = Validator::make($request->all(), [
@@ -424,26 +412,24 @@ class OfisiController extends Controller
         );
 
         return response()->json([
-            'message' => "Umefanikiwa kufungua ofisi ya {$ofisi->jina}.",
-        ], 200);
+            'message' => "Umefanikiwa kufungua ofisi ya $ofisi->jina.",
+        ]);
     }
 
     public function jiungeOfisiBilaUser(OfisiRequest $request, OfisiService $ofisiService)
     {
-        $user = Auth::user();
+        $user = $this->auth_user;
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
-
-        if (!$ofisi || !$ofisi->pivot->position_id) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+        $cheoModel = $user->getCheoKwaOfisi($ofisi->id);
+        if (!$cheoModel) {
+            return response()->json([
+                'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.',
+            ], 400);
         }
 
-        $position = Position::find($ofisi->pivot->position_id);
-        if (!$position) {
-            throw new \Exception("Cheo chako hakijapatikana. Tafadhali wasiliana na msaada.");
-        }
 
         $validator = Validator::make($request->all(), [
             'ofisiId' => 'required|integer|exists:ofisis,id',
@@ -497,23 +483,25 @@ class OfisiController extends Controller
         );
 
         return response()->json([
-            'message' => "Umefanikiwa kutuma ombi la kujiunga na ofisi ya {$ofisi->jina}. Subiri kukubaliwa.",
-        ], 200);
+            'message' => "Umefanikiwa kutuma ombi la kujiunga na ofisi ya $ofisi->jina. Subiri kukubaliwa.",
+        ]);
     }
 
     public function getOfisiUsersWithDetails(OfisiService $ofisiService)
     {
-        $user = Auth::user();
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
         $ofisiId = $ofisi->id;
 
-        $position = $ofisi->pivot->position_id;
-        if (!$position) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona watumishi wa ofisi na utendaji wao.");
+        $cheoModel = $this->auth_user->getCheoKwaOfisi($ofisi->id);
+
+        if (!$cheoModel) {
+            return response()->json([
+                'message' => "Wewe sio kiongozi wa ofisi, huna uwezo wa kuona watumishi wa ofisi na utendaji wao.",
+            ],400);
         }
 
         $users = User::whereHas('maofisi', function ($query) use ($ofisiId) {
@@ -623,23 +611,22 @@ class OfisiController extends Controller
         return response()->json([
             'users' => $data,
             'positions' => $positions,
-        ], 200);
+        ]);
     }
 
     public function futaMtumishi(OfisiRequest $request, OfisiService $ofisiService)
     {
-        $user = Auth::user();
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
-        $position = $ofisi->pivot->position_id;
+        $cheoModel = $this->auth_user->getCheoKwaOfisi($ofisi->id);
 
-        $positionRecord = Position::find($position);
-
-        if (!$positionRecord) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+        if (!$cheoModel) {
+            return response()->json([
+                'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.',
+            ], 400);
         }
 
         // Validate target user ID
@@ -672,23 +659,24 @@ class OfisiController extends Controller
 
         return response()->json([
             'message' => 'Mtumishi amefutwa kwa mafanikio kutoka ofisi yako.',
-        ], 200);
+        ]);
     }
 
     public function badiliCheo(OfisiRequest $request, OfisiService $ofisiService)
     {
 
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof \Illuminate\Http\JsonResponse) {
+        if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
-        $position = $ofisi->pivot->position_id;
+        $cheoModel = $this->auth_user->getCheoKwaOfisi($ofisi->id);
 
-        $positionRecord = Position::find($position);
 
-        if (!$positionRecord) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+        if (!$cheoModel) {
+            return response()->json([
+                'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.',
+            ], 400);
         }
 
         // Validate incoming request
@@ -722,7 +710,7 @@ class OfisiController extends Controller
 
         return response()->json([
             'message' => 'Mtumishi amebadilishiwa cheo kikamilifu.',
-        ], 200);
+        ]);
     }
 
 
@@ -754,7 +742,7 @@ class OfisiController extends Controller
                 'loan_id' => $loan->id,
                 'performed_by' => Auth::id(),
                 'action' => 'created',
-                'description' => "Mkopo huu umemaliza muda wake wa kimkataba, hivyo upo nje ya muda wake wa marejesho, deni lililobaki ni {$remainingBalance}.",
+                'description' => "Mkopo huu umemaliza muda wake wa kimkataba, hivyo upo nje ya muda wake wa marejesho, deni lililobaki ni $remainingBalance.",
             ]);
 
             $customers = Customer::whereIn(
@@ -767,7 +755,7 @@ class OfisiController extends Controller
             // Format customer names
             $names = $this->formatCustomerNames($customers);
 
-            $this->sendNotificationUongozi("Mkopo wa kiasi cha Tsh {$loan->total_due} umemaliza muda wake wa kimkataba, hivyo upo nje ya muda wake wa marejesho. Deni lililobakia ni {$remainingBalance} na wateja wanaohusika na mkopo huu ni {$names}.", $ofisiId);
+            $this->sendNotificationUongozi("Mkopo wa kiasi cha Tsh $loan->total_due umemaliza muda wake wa kimkataba, hivyo upo nje ya muda wake wa marejesho. Deni lililobakia ni $remainingBalance na wateja wanaohusika na mkopo huu ni $names.", $ofisiId);
         }
     }
 

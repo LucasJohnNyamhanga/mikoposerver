@@ -30,12 +30,22 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
+    public function getCheoKwaOfisi(int $ofisiId): ?string
+    {
+        $userOfisi = UserOfisi::where('user_id', $this->id)
+            ->where('ofisi_id', $ofisiId)
+            ->first();
+
+        return $userOfisi?->position;
+    }
+
     public function ofisis(): BelongsToMany
     {
         return $this->belongsToMany(Ofisi::class, 'user_ofisis')
-                    ->withPivot('status')
-                    ->wherePivot('status', 'accepted')
-                    ->withTimestamps();
+            ->using(UserOfisi::class)
+            ->withPivot(['position_id', 'status', 'isActive'])
+            ->wherePivot('status', 'accepted')
+            ->withTimestamps();
     }
 
     public function positions(): HasManyThrough

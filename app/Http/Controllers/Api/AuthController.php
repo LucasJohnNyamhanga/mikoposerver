@@ -15,6 +15,16 @@ use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
+
+    protected string $appName;
+    protected string $helpNumber;
+    protected string $app_url;
+    public function __construct()
+    {
+        $this->appName = config('services.app.name');
+        $this->helpNumber = config('services.help.number');
+        $this->app_url = config('services.appurl.name');
+    }
     public function registerMtumishiNewOfisi(AuthRequest $request)
     {
         // Validate the incoming request
@@ -22,11 +32,11 @@ class AuthController extends Controller
             'jinaKamili' => 'required|string|max:255',
             'simu' => 'required|string|max:15',
             'makazi' => 'required|string|max:255',
-            'picha' => 'required|string', 
+            'picha' => 'required|string',
             'jinaMdhamini' => 'required|string|max:255',
             'simuMdhamini' => 'required|string|max:255',
-            'jinaMtumiaji' => 'required|string|max:255', 
-            'password' => 'required|string|max:255', 
+            'jinaMtumiaji' => 'required|string|max:255',
+            'password' => 'required|string|max:255',
             'jinaOfisi' => 'required|string|max:255',
             'mkoa' => 'required|string|max:255',
             'wilaya' => 'required|string|max:255',
@@ -68,7 +78,7 @@ class AuthController extends Controller
 
 
             $ofisi = Ofisi::create([
-                'jina' => $request->jinaOfisi, 
+                'jina' => $request->jinaOfisi,
                 'mkoa' => $request->mkoa,
                 'wilaya' => $request->wilaya,
                 'kata' => $request->kata,
@@ -81,20 +91,14 @@ class AuthController extends Controller
             ]);
 
             DB::table('actives')->updateOrInsert(
-                ['user_id' => $user->id], 
+                ['user_id' => $user->id],
                 ['ofisi_id' => $ofisi->id, 'updated_at' => now(), 'created_at' => now()]
             );
 
-            $ofisiYake = $user->maofisi->where('id', $ofisi->id)->first();
+            $cheo = $user->getCheoKwaOfisi($ofisi->id)->name;
 
-            $position = $ofisiYake->pivot->position_id;
-
-            $positionRecord = Position::find($position);
-
-            $cheo = $positionRecord->name;
-
-            $appName = env('APP_NAME');
-            $helpNumber = env('APP_HELP');
+            $appName = $this->appName;
+            $helpNumber = $this->helpNumber;
 
             $this->sendNotification(
                     "Hongera, karibu kwenye mfumo wa {$appName}, umefanikiwa kufungua akaunti ya ofisi ya {$ofisi->jina} iliyopo mkoa wa {$ofisi->mkoa}, wilaya ya {$ofisi->wilaya} kwenye kata ya {$ofisi->kata}, kwa sasa wewe unawadhifa wa {$cheo} kwenye ofisi hii. mabadiliko ya uwendeshaji wa ofisi unaweza kuyafanya kwenye menu ya mfumo kupitia Usimamizi. Kwa msaada piga simu namba {$helpNumber}, Asante.",
@@ -108,9 +112,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'Akaunti imetengenezwa, Ingia kwenye mfumo kuendelea.'], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            $baseUrl = env('APP_URL');
+            $baseUrl = $this->app_url;
+
+
+
             $imagePath = $request->picha;
-            
+
             $filePathImage = trim(str_replace($baseUrl, '', $imagePath));
             $filePath = public_path($filePathImage);
             if (file_exists($filePath)) {
@@ -122,7 +129,7 @@ class AuthController extends Controller
         }
     }
 
-    
+
 
     public function validateNewRegisterRequest(AuthRequest $request)
     {
@@ -176,7 +183,7 @@ class AuthController extends Controller
             'simu' => 'required|string|max:15|unique:users,mobile', // Ensures the phone number is unique
             'makazi' => 'required|string|max:255',
             'jinaMtumiaji' => 'required|string|max:255|unique:users,username', // Ensures the username is unique
-            'ofisiId' => 'required|integer', 
+            'ofisiId' => 'required|integer',
         ], [
             'simu.unique' => 'Namba ya simu imeshatumika tayari. Tafadhali tumia namba nyingine.', // Custom message for the 'unique' validation on 'simu'
             'jinaMtumiaji.unique' => 'Jina la mtumiaji limeshatumika tayari. Tafadhali tumia jina lingine.', // Custom message for the 'unique' validation on 'jinaMtumiaji'
@@ -215,11 +222,11 @@ class AuthController extends Controller
             'jinaKamili' => 'required|string|max:255',
             'simu' => 'required|string|max:15',
             'makazi' => 'required|string|max:255',
-            'picha' => 'required|string', 
+            'picha' => 'required|string',
             'jinaMdhamini' => 'required|string|max:255',
             'simuMdhamini' => 'required|string|max:255',
-            'jinaMtumiaji' => 'required|string|max:255', 
-            'password' => 'required|string|max:255', 
+            'jinaMtumiaji' => 'required|string|max:255',
+            'password' => 'required|string|max:255',
             'ofisiId' => 'required|integer',
         ]);
 
@@ -264,12 +271,12 @@ class AuthController extends Controller
             }
 
             DB::table('actives')->updateOrInsert(
-                ['user_id' => $user->id], 
+                ['user_id' => $user->id],
                 ['ofisi_id' => $ofisi->id, 'updated_at' => now(), 'created_at' => now()]
             );
 
-            $appName = env('APP_NAME');
-            $helpNumber = env('APP_HELP');
+            $appName = $this->appName;
+            $helpNumber = $this->helpNumber;
 
             $this->sendNotification(
                     "Hongera, karibu kwenye mfumo wa {$appName}, umefanikiwa kufungua akaunti ya ofisi ya {$ofisi->jina} iliyopo mkoa wa {$ofisi->mkoa}, wilaya ya {$ofisi->wilaya} kwenye kata ya {$ofisi->kata}, kwa sasa wewe unawadhifa wa Mtumishi kwenye ofisi hii. tunakutakia kazi njema. Kwa msaada piga simu namba {$helpNumber}, Asante.",
@@ -283,9 +290,9 @@ class AuthController extends Controller
             return response()->json(['message' => 'Akaunti imetengenezwa, Ingia kwenye mfumo kuendelea.'], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            $baseUrl = env('APP_URL');
+            $baseUrl = $this->app_url;
             $imagePath = $request->picha;
-            
+
             $filePathImage = trim(str_replace($baseUrl, '', $imagePath));
             $filePath = public_path($filePathImage);
             if (file_exists($filePath)) {
@@ -300,8 +307,8 @@ class AuthController extends Controller
     public function registerMtumishi(AuthRequest $request)
     {
         $user = Auth::user();
-        $helpNumber = env('APP_HELP');
-        $appName = env('APP_NAME');
+        $helpNumber = $this->helpNumber;
+        $appName = $this->appName;
 
         if (!$user) {
             throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
@@ -335,11 +342,11 @@ class AuthController extends Controller
             'jinaKamili' => 'required|string|max:255',
             'simu' => 'required|string|max:15',
             'makazi' => 'required|string|max:255',
-            'picha' => 'required|string', 
+            'picha' => 'required|string',
             'jinaMdhamini' => 'required|string|max:255',
             'simuMdhamini' => 'required|string|max:255',
-            'jinaMtumiaji' => 'required|string|max:255', 
-            'password' => 'required|string|max:255', 
+            'jinaMtumiaji' => 'required|string|max:255',
+            'password' => 'required|string|max:255',
             'ofisiId' => 'required|integer',
         ]);
 
@@ -384,7 +391,7 @@ class AuthController extends Controller
             }
 
             DB::table('actives')->updateOrInsert(
-                ['user_id' => $msajiliwa->id], 
+                ['user_id' => $msajiliwa->id],
                 ['ofisi_id' => $ofisi->id, 'updated_at' => now(), 'created_at' => now()]
             );
 
@@ -407,9 +414,9 @@ class AuthController extends Controller
             return response()->json(['message' => 'Akaunti imetengenezwa kikamilifu.'], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            $baseUrl = env('APP_URL');
+            $baseUrl = $this->app_url;
             $imagePath = $request->picha;
-            
+
             $filePathImage = trim(str_replace($baseUrl, '', $imagePath));
             $filePath = public_path($filePathImage);
             if (file_exists($filePath)) {
@@ -424,8 +431,8 @@ class AuthController extends Controller
     public function editMtumishi(AuthRequest $request)
     {
         $user = Auth::user();
-        $helpNumber = env('APP_HELP');
-        $appName = env('APP_NAME');
+        $helpNumber = $this->helpNumber;
+        $appName = $this->appName;
 
         if (!$user) {
             throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
@@ -523,12 +530,31 @@ class AuthController extends Controller
             );
 
             // Delete old image if changed
-            if ($oldImage !== $request->picha) {
-                $baseUrl = env('APP_URL');
-                $oldPath = trim(str_replace($baseUrl, '', $oldImage));
-                $oldFilePath = public_path($oldPath);
-                if (file_exists($oldFilePath)) {
-                    unlink($oldFilePath);
+
+            $oldImage = $request->get('old_image'); // e.g. https://yourdomain/uploads/... or full S3 URL
+            $disk = config('filesystems.default');
+
+            if ($oldImage && $oldImage !== $request->picha) {
+                if ($disk === 's3') {
+                    // Strip base URL to get the relative path (after bucket domain or AWS_URL)
+                    if (env('AWS_URL')) {
+                        $prefix = rtrim(env('AWS_URL'), '/') . '/';
+                    } else {
+                        $prefix = 'https://' . env('AWS_BUCKET') . '.s3.' . env('AWS_DEFAULT_REGION') . '.amazonaws.com/';
+                    }
+
+                    $s3Path = str_replace($prefix, '', $oldImage); // Get S3 file key
+                    Storage::disk('s3')->delete($s3Path);
+
+                } else {
+                    // Local deletion
+                    $baseUrl = config('app.url');
+                    $relativePath = trim(str_replace($baseUrl, '', $oldImage), '/'); // e.g. uploads/mikopo/images/filename.jpg
+                    $filePath = public_path($relativePath);
+
+                    if (file_exists($filePath)) {
+                        unlink($filePath);
+                    }
                 }
             }
 
@@ -539,7 +565,7 @@ class AuthController extends Controller
             DB::rollBack();
 
             // Delete new image on failure
-            $baseUrl = env('APP_URL');
+            $baseUrl = $this->app_url;
             $imagePath = $request->picha;
             $filePath = public_path(trim(str_replace($baseUrl, '', $imagePath)));
             if (file_exists($filePath)) {
@@ -564,7 +590,7 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return response()->json(['message' => 'Jaza nafasi zote zilizo wazi.', 'errors' => $validator->errors()], 400);
         }
-        
+
         $username = $request->input('username');
         $password = $request->input('password');
 
@@ -585,7 +611,7 @@ class AuthController extends Controller
                 'user' => $user,
                 'token' => $token,
             ], 200);
-    
+
         } else {
             return response()->json(['message' => 'Jina au neno la siri uliotumia, siyo sahihi.'], 401);
         }

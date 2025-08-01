@@ -9,8 +9,6 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Ofisi extends Model
 {
-    public mixed $pivot;
-
     public function users():BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_ofisis')->latest()

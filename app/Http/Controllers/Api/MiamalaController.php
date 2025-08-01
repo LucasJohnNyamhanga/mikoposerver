@@ -10,6 +10,7 @@ use App\Models\Message;
 use App\Models\Ofisi;
 use App\Models\Position;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Services\OfisiService;
 use Carbon\Carbon;
 use Exception;
@@ -23,6 +24,17 @@ use Throwable;
 
 class MiamalaController extends Controller
 {
+    protected string $appName;
+    protected string $helpNumber;
+    protected User $auth_user;
+
+    public function __construct()
+    {
+        $this->appName = config('services.app.name');
+        $this->helpNumber = config('services.help.number');
+        $this->auth_user = Auth::user();
+    }
+
     public function lipiaRejesho(MiamalaRequest $request, OfisiService $ofisiService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
@@ -44,8 +56,8 @@ class MiamalaController extends Controller
             DB::beginTransaction();
 
             $user = Auth::user();
-            $appName = config('services.app.name');
-            $helpNumber = config('services.help.number');
+            $appName = $this->appName;
+            $helpNumber = $this->helpNumber;
 
             $loan = Loan::findOrFail($data['loanId']);
 
@@ -164,10 +176,10 @@ class MiamalaController extends Controller
         try {
 
             $ofisi = Ofisi::findOrFail($request->ofisiId); // Ensure the office exists
-            $user = Auth::user();
+            $user = $this->auth_user;
 
-            $appName = config('services.app.name');
-            $helpNumber = config('services.help.number');
+            $appName = $this->appName;
+            $helpNumber = $this->helpNumber;
 
             try {
                 DB::beginTransaction();
@@ -254,25 +266,22 @@ class MiamalaController extends Controller
 
     public function sajiliPato(MiamalaRequest $request, OfisiService $ofisiService)
     {
-        $appName = config('services.app.name');
-        $helpNumber = config('services.help.number');
+        $appName = $this->appName;
+        $helpNumber = $this->helpNumber;
 
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
         if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
-        $user = Auth::user();
+        $user = $this->auth_user;
+        $cheoModel = $user->getCheoKwaOfisi($ofisi->id);
 
-        $position = $ofisi->pivot->position_id;
-
-        $positionRecord = Position::find($position);
-
-        if (!$positionRecord) {
+        if (!$cheoModel) {
             throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili pato.");
         }
 
-        $cheo = $positionRecord->name;
+        $cheo = $cheoModel->name;
         // Validate input
         $validator = Validator::make($request->all(), [
             'type' => [
@@ -364,24 +373,22 @@ class MiamalaController extends Controller
 
     public function sajiliTumizi(MiamalaRequest $request, OfisiService $ofisiService)
     {
-        $appName = config('services.app.name');
-        $helpNumber = config('services.help.number');
-        $user = Auth::user();
+        $appName = $this->appName;
+        $helpNumber = $this->helpNumber;
+        $user = $this->auth_user;
 
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
         if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
-        $position = $ofisi->pivot->position_id;
+        $cheoModel = $user->getCheoKwaOfisi($ofisi->id);
 
-        $positionRecord = Position::find($position);
-
-        if (!$positionRecord) {
+        if (!$cheoModel) {
             throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili tumizi.");
         }
 
-        $cheo = $positionRecord->name;
+        $cheo = $cheoModel->name;
         // Validate input
         $validator = Validator::make($request->all(), [
             'type' => [
@@ -470,11 +477,9 @@ class MiamalaController extends Controller
             return $ofisi;
         }
 
-        $position = $ofisi->pivot->position_id;
+        $cheoModel = $this->auth_user->getCheoKwaOfisi($ofisi->id);
 
-        $positionRecord = Position::find($position);
-
-        if (!$positionRecord) {
+        if (!$cheoModel) {
             throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.");
         }
 
@@ -499,11 +504,9 @@ class MiamalaController extends Controller
             return $ofisi;
         }
 
-        $position = $ofisi->pivot->position_id;
+        $cheoModel = $this->auth_user->getCheoKwaOfisi($ofisi->id);
 
-        $positionRecord = Position::find($position);
-
-        if (!$positionRecord) {
+        if (!$cheoModel) {
             throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.");
         }
 
@@ -545,10 +548,9 @@ class MiamalaController extends Controller
             return $ofisi;
         }
 
-        $positionId = optional($ofisi->pivot)->position_id;
-        $positionRecord = Position::find($positionId);
+        $cheoModel = $this->auth_user->getCheoKwaOfisi($ofisi->id);
 
-        abort_unless((bool)$positionRecord, 403, 'Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.');
+        abort_unless((bool)$cheoModel, 403, 'Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.');
 
         $validator = Validator::make($request->all(), [
             'startDate' => 'required|date',
