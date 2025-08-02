@@ -49,7 +49,7 @@ class OfisiController extends Controller
         return response()->json(['ofisi' => $ofisi]);
     }
 
-    public function getOfisiData( OfisiService $ofisiService)
+    public function getOfisiData(OfisiService $ofisiService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
         if ($ofisi instanceof JsonResponse) {
@@ -58,45 +58,76 @@ class OfisiController extends Controller
 
         $user = $this->auth_user;
 
-        $this->updateLoanStatuses($ofisi->id);//its working
+        // Update loan statuses
+        $this->updateLoanStatuses($ofisi->id);
 
-        $ofisiYangu = Ofisi::with(['users'=> function ($query) {
-                $query->with(['receivedMessages' => function ($query) {
-                            $query->with(['sender', 'receiver'])
-                            ->where('receiver_id', Auth::id())
-                                ->latest();
-                        }
-                    ])->latest();
-                },'customers'=> function ($query) {
-                            $query->latest();
-                        }
-                        ,'loans' => function ($query) {
-                        $query->with(['customers','user','transactions'=> function ($query) {
-                            $query->with([
-                                'user','approver','creator','customer'
-                            ])
+        $ofisiYangu = Ofisi::with([
+            // All users + their unread messages sent to current user
+            'users' => function ($query) use ($user) {
+                $query->with([
+                    'receivedMessages' => function ($q) use ($user) {
+                        $q->where('receiver_id', $user->id)
+                            ->where('status', 'unread') // Only unread messages
+                            ->with(['sender', 'receiver'])
+                            ->latest();
+                    }
+                ])->latest();
+            },
+
+            // Customers in this office
+            'customers' => function ($query) {
+                $query->latest();
+            },
+
+            // Loans in this office
+            'loans' => function ($query) {
+                $query->with([
+                    'customers',
+                    'user',
+                    'transactions' => function ($q) {
+                        $q->with([
+                            'user',
+                            'approver',
+                            'creator',
+                            'customer'
+                        ])
                             ->where('status', 'completed')
                             ->latest();
-                        }
-                        ,'wadhamini','dhamana','mabadiliko'=> function ($query) {
-                            $query->latest();
-                        }
-                        ])
-                        //->whereIn('status', ['approved','defaulted',])
-                        ->latest();
-                    },'transactions'=> function ($query) {
-                            $query->with([
-                                'user','approver','creator','customer'
-                            ])
-                            ->where('status', 'completed')
-                            ->whereDate('created_at', now()->toDateString())->latest();
-                        },'ainamikopo'])->where('id', $ofisi->id)->first();
+                    },
+                    'wadhamini',
+                    'dhamana',
+                    'mabadiliko' => function ($q) {
+                        $q->latest();
+                    }
+                ])
+                    ->latest();
+            },
+
+            // All today's transactions
+            'transactions' => function ($query) {
+                $query->with([
+                    'user',
+                    'approver',
+                    'creator',
+                    'customer'
+                ])
+                    ->where('status', 'completed')
+                    ->whereDate('created_at', now()->toDateString())
+                    ->latest();
+            },
+
+            // Loan types (static or dynamic depending on system)
+            'ainamikopo'
+        ])
+            ->where('id', $ofisi->id)
+            ->first();
 
         return response()->json([
-        'user_id' => $user->id,
-        'ofisi' => $ofisiYangu,
+            'user_id' => $user->id,
+            'ofisi' => $ofisiYangu,
         ]);
     }
+
 
     public function getMapato(OfisiRequest $request, OfisiService $ofisiService)
     {

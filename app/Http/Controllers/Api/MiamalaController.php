@@ -281,7 +281,7 @@ class MiamalaController extends Controller
             throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili pato.");
         }
 
-        $cheo = $cheoModel->name;
+        $cheo = $cheoModel;
         // Validate input
         $validator = Validator::make($request->all(), [
             'type' => [
@@ -388,7 +388,7 @@ class MiamalaController extends Controller
             throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kusajili tumizi.");
         }
 
-        $cheo = $cheoModel->name;
+        $cheo = $cheoModel;
         // Validate input
         $validator = Validator::make($request->all(), [
             'type' => [

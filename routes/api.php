@@ -70,7 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('initiatePayment', [ZenoPayController::class, 'initiatePayment']);
     Route::get('getVifurushi', [VifurushiController::class, 'getVifurushi']);
     Route::get('paymentStatus', [VifurushiController::class, 'paymentStatus']);
-
+    Route::get('getMessages', [MessageController::class, 'getMessages']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

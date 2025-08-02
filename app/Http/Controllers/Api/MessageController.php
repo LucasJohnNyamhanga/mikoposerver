@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\MessageRequest;
 use App\Models\Message;
 use App\Models\Ofisi;
+use App\Services\OfisiService;
+use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 
 class MessageController extends Controller
 {
@@ -43,8 +45,32 @@ class MessageController extends Controller
 
             return response()->json([
                 'message' =>  "Ujumbe umewekwa kuwa zimesoma."
-            ], 200);
-        } catch (\Exception $e) {
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => "Tatizo ni: " . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getMessages( OfisiService $ofisiService)
+    {
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) {
+            return $ofisi;
+        }
+
+        try {
+            $messages = Message::with(['sender', 'receiver'])
+                ->where('receiver_id', Auth::id())
+                ->where('ofisi_id', $ofisi->id)
+                ->latest()
+                ->paginate(7);
+
+            return response()->json([
+                'messages' =>  $messages
+            ]);
+        } catch (Exception $e) {
             return response()->json([
                 'message' => "Tatizo ni: " . $e->getMessage()
             ], 500);
