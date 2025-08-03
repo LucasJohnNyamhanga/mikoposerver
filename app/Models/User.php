@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 
@@ -15,28 +15,22 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    // Relationships
+    /** --------------------
+     *  Relationships
+     *  -------------------- */
+
     public function kifurushis(): BelongsToMany
     {
         return $this->belongsToMany(Kifurushi::class, 'user_kifurushis')
-                    ->withPivot(['start_date', 'end_date'])
-                    ->withTimestamps();
+            ->withPivot(['start_date', 'end_date'])
+            ->withTimestamps();
     }
 
     public function maofisi(): BelongsToMany
     {
         return $this->belongsToMany(Ofisi::class, 'user_ofisis')
-                    ->withPivot('position_id', 'status', 'isActive')
-                    ->withTimestamps();
-    }
-
-    public function getCheoKwaOfisi(int $ofisiId): ?string
-    {
-        $userOfisi = UserOfisi::where('user_id', $this->id)
-            ->where('ofisi_id', $ofisiId)
-            ->first();
-
-        return $userOfisi?->position;
+            ->withPivot('position_id', 'status', 'isActive')
+            ->withTimestamps();
     }
 
     public function ofisis(): BelongsToMany
@@ -98,21 +92,34 @@ class User extends Authenticatable
         return $this->hasMany(Payment::class);
     }
 
-    /**
-     * Get the user's position in a given ofisi.
-     */
+    /** --------------------
+     *  Custom Methods
+     *  -------------------- */
+
+    public function getCheoKwaOfisi(int $ofisiId): ?string
+    {
+        $userOfisi = UserOfisi::where('user_id', $this->id)
+            ->where('ofisi_id', $ofisiId)
+            ->first();
+
+        return $userOfisi?->position;
+    }
+
     public function positionInOfisi(int $ofisiId): ?Position
     {
         $userOfisi = $this->maofisi()
-                         ->where('ofisi_id', $ofisiId)
-                         ->first();
+            ->where('ofisi_id', $ofisiId)
+            ->first();
 
         return $userOfisi && $userOfisi->pivot->position_id
             ? Position::find($userOfisi->pivot->position_id)
             : null;
     }
 
-    // Mass assignable attributes
+    /** --------------------
+     *  Attributes
+     *  -------------------- */
+
     protected $fillable = [
         'mobile',
         'jina_kamili',
@@ -127,13 +134,11 @@ class User extends Authenticatable
         'anakoishi',
     ];
 
-    // Hidden attributes for arrays
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    // Attribute casting
     protected $casts = [
         'is_manager' => 'boolean',
         'is_admin' => 'boolean',

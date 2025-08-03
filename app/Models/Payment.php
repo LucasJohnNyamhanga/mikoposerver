@@ -2,35 +2,66 @@
 
 namespace App\Models;
 
-use App\Jobs\CheckPaymentStatus;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
+
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int $kifurushi_id
+ * @property int $ofisi_id
+ * @property string $reference
+ * @property string $status
+ * @property string|null $transaction_id
+ * @property string|null $channel
+ * @property string|null $phone
+ * @property float $amount
+ * @property int $retries_count
+ * @property Carbon|null $next_check_at
+ * @property Carbon|null $paid_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 
 class Payment extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
-        'kifurushi_id',
         'user_id',
-        'reference',
+        'ofisi_id',
+        'kifurushi_id',
+        'amount',
         'status',
+        'reference',
         'transaction_id',
         'channel',
         'phone',
-        'amount',
         'retries_count',
         'next_check_at',
         'paid_at',
     ];
 
     protected $casts = [
+        'amount' => 'float',
         'next_check_at' => 'datetime',
         'paid_at' => 'datetime',
-        'amount' => 'decimal:2',
     ];
+
+    /** --------------------
+     *  Relationships
+     *  -------------------- */
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function ofisi(): BelongsTo
+    {
+        return $this->belongsTo(Ofisi::class);
     }
 
     public function kifurushi(): BelongsTo
@@ -38,18 +69,17 @@ class Payment extends Model
         return $this->belongsTo(Kifurushi::class);
     }
 
-    public function kifurushiPurchase()
+    /** --------------------
+     *  Scopes
+     *  -------------------- */
+
+    public function scopeCompleted($query)
     {
-        return $this->hasOne(KifurushiPurchase::class, 'reference', 'reference');
+        return $query->where('status', 'completed');
     }
 
-
-    protected static function booted()
+    public function scopePending($query)
     {
-        static::created(function ($payment) {
-            if ($payment->status === 'pending') {
-                CheckPaymentStatus::dispatch($payment);
-            }
-        });
+        return $query->where('status', 'pending');
     }
 }

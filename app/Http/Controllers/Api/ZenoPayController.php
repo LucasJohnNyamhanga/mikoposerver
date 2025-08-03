@@ -21,9 +21,6 @@ class ZenoPayController extends Controller
 
     /**
      * Initiates a payment via ZenoPay API
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
     public function initiatePayment(Request $request)
     {
@@ -47,10 +44,10 @@ class ZenoPayController extends Controller
 
         $buyerEmail = $request->buyerEmail ?? 'datasofttanzania@gmail.com';
         $buyerName = $request->buyerName ?? 'Anonymous User';
-        $webhookUrl = env('ZENOPAY_CALLBACK_URL'); // Ensure this route is secured!
+        $webhookUrl = env('ZENOPAY_CALLBACK_URL');
 
         try {
-            // Call ZenoPay API
+            // Create payment via ZenoPay API
             $response = $this->zenoPay->createPayment(
                 orderId: $request->reference,
                 buyerEmail: $buyerEmail,
@@ -62,7 +59,17 @@ class ZenoPayController extends Controller
 
             $channel = $this->getMtandaoFromNumber($request->mobile);
 
-            // Save to local DB
+            // Determine ofisi_id, e.g. from user's activeOfisi relation or fallback
+            $ofisiId = null;
+            if ($user->relationLoaded('activeOfisi') && $user->activeOfisi) {
+                $ofisiId = $user->activeOfisi->ofisi_id ?? null;
+            } else {
+                // Fallback: get first accepted ofisi if no activeOfisi loaded
+                $firstOfisi = $user->ofisis()->first();
+                $ofisiId = $firstOfisi?->id;
+            }
+
+            // Save to local DB with ofisi_id
             $payment = Payment::create([
                 'reference'     => $request->reference,
                 'amount'        => $request->amount,
@@ -70,6 +77,7 @@ class ZenoPayController extends Controller
                 'kifurushi_id'  => $request->kifurushiId,
                 'phone'         => $request->mobile,
                 'user_id'       => $user->id,
+                'ofisi_id'      => $ofisiId,
                 'channel'       => $channel,
             ]);
 
@@ -77,6 +85,7 @@ class ZenoPayController extends Controller
                 'reference' => $payment->reference,
                 'mobile' => $payment->phone,
                 'user_id' => $user->id,
+                'ofisi_id' => $ofisiId,
                 'api_response' => $response,
             ]);
 

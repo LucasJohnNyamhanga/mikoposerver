@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    // 🔐 Required to allow raw index outside of transaction
+    public $withinTransaction = false;
+
     /**
      * Run the migrations.
      */
@@ -14,28 +17,28 @@ return new class extends Migration
     {
         Schema::create('kifurushi_purchases', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('kifurushi_id')->constrained()->onDelete('cascade');
             $table->foreignId('ofisi_id')->constrained()->onDelete('cascade');
 
-            // Instead of ENUM, use string for PostgreSQL
-            $table->string('status', 20)->default('pending')->index(); 
+            $table->string('status', 20)->default('pending')->index(); // e.g., pending, approved, expired
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamp('approved_at')->nullable();
-            
-            $table->string('reference')->nullable()->unique(); // Unique reference number
+            $table->string('reference')->nullable()->unique(); // Unique external ref (e.g. ZenoPay)
+
             $table->timestamps();
 
-            // Composite index for filtering by user and status
+            // 🔍 Composite index to filter by user + status
             $table->index(['user_id', 'status']);
         });
 
-        // Partial index for faster queries on active and pending purchases
+        // ✅ PostgreSQL partial index for pending + active purchases
         DB::statement("
-            CREATE INDEX kifurushi_active_pending_idx 
-            ON kifurushi_purchases (user_id) 
+            CREATE INDEX kifurushi_active_pending_idx
+            ON kifurushi_purchases (user_id)
             WHERE status = 'pending' AND is_active = true
         ");
     }
