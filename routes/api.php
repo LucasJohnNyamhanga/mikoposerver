@@ -71,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('getVifurushi', [VifurushiController::class, 'getVifurushi']);
     Route::get('paymentStatus', [VifurushiController::class, 'paymentStatus']);
     Route::get('getMessages', [MessageController::class, 'getMessages']);
+    Route::get('getValidOfisi', [OfisiController::class, 'getValidOfisi']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

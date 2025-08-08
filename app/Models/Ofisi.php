@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Ofisi extends Model
 {
@@ -99,6 +100,11 @@ class Ofisi extends Model
     public function kifurushiPurchases(): Ofisi|HasMany
     {
         return $this->hasMany(KifurushiPurchase::class);
+    }
+
+    public function verifiedAccount(): Ofisi|HasOne
+    {
+        return $this->hasOne(VerifiedAccount::class);
     }
 
 

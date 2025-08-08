@@ -123,7 +123,7 @@ class User extends Authenticatable
             ->where('ofisi_id', $ofisiId)
             ->first();
 
-        return $userOfisi?->position;
+        return $userOfisi?->position->name;
     }
 
     public function positionInOfisi(int $ofisiId): ?Position

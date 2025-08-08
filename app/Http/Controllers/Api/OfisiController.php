@@ -258,6 +258,62 @@ class OfisiController extends Controller
         return response()->json($ofisis);
     }
 
+    public function getValidOfisi(OfisiService $ofisiService): JsonResponse
+    {
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) {
+            return $ofisi;
+        }
+
+        $userId = $this->auth_user->id;
+
+        $user = User::with([
+            'ofisis' => function ($query) {
+                $query
+                    ->select('ofisis.*')
+                    ->whereHas('verifiedAccount') // Only include ofisis that have a verifiedAccount relationship
+                    ->withCount('customers')
+                    ->withCount([
+                        'acceptedUsers as users_count',
+                    ])
+                    ->withCount([
+                        'loans as active_loans_count' => function ($q) {
+                            $q->whereIn('status', ['approved', 'defaulted']);
+                        }
+                    ])
+                    ->withSum([
+                        'loans as total_amount_loaned' => function ($q) {
+                            $q->whereIn('status', ['approved', 'defaulted']);
+                        }
+                    ], 'amount')
+                    ->withSum([
+                        'loans as amount_defaulted' => function ($q) {
+                            $q->where('status', 'defaulted');
+                        }
+                    ], 'amount');
+            }
+        ])->findOrFail($userId);
+
+        $ofisis = $user->ofisis->map(function ($ofisi) {
+            return [
+                'id' => $ofisi->id,
+                'jina' => $ofisi->jina,
+                'mkoa' => $ofisi->mkoa,
+                'wilaya' => $ofisi->wilaya,
+                'kata' => $ofisi->kata,
+                'customers_count' => $ofisi->customers_count,
+                'users_count' => $ofisi->users_count,
+                'active_loans_count' => $ofisi->active_loans_count,
+                'total_amount_loaned' => (float) $ofisi->total_amount_loaned,
+                'amount_defaulted' => (float) $ofisi->amount_defaulted,
+                'position_id' => $ofisi->pivot?->position_id,
+            ];
+        });
+
+        return response()->json($ofisis);
+    }
+
+
     public function getMwamala(OfisiRequest $request, OfisiService $ofisiService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();

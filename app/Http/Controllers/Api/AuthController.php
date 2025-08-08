@@ -95,7 +95,7 @@ class AuthController extends Controller
                 ['ofisi_id' => $ofisi->id, 'updated_at' => now(), 'created_at' => now()]
             );
 
-            $cheo = $user->getCheoKwaOfisi($ofisi->id)->name;
+            $cheo = $user->getCheoKwaOfisi($ofisi->id);
 
             $appName = $this->appName;
             $helpNumber = $this->helpNumber;

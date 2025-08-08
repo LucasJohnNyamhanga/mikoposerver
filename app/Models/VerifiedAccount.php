@@ -31,6 +31,8 @@ class VerifiedAccount extends Model
         return $this->belongsTo(Ofisi::class);
     }
 
+
+
     protected static function booted(): void
     {
         static::creating(function ($verified) {
