@@ -86,6 +86,23 @@ class Ofisi extends Model
         return $this->hasMany(Dhamana::class);
     }
 
+    public function verifiedAccounts(): Ofisi|HasMany
+    {
+        return $this->hasMany(VerifiedAccount::class);
+    }
+
+    public function smsBalances(): Ofisi|HasMany
+    {
+        return $this->hasMany(SmsBalance::class);
+    }
+
+    public function kifurushiPurchases(): Ofisi|HasMany
+    {
+        return $this->hasMany(KifurushiPurchase::class);
+    }
+
+
+
     protected $fillable = [
         'jina',
         'mkoa',

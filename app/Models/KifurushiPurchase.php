@@ -35,6 +35,12 @@ class KifurushiPurchase extends Model
         return $this->belongsTo(Kifurushi::class);
     }
 
+    public function ofisi(): BelongsTo
+    {
+        return $this->belongsTo(Ofisi::class);
+    }
+
+
     public function payment()
     {
         return $this->hasOne(Payment::class, 'reference', 'reference');

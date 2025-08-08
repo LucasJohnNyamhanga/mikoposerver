@@ -92,6 +92,27 @@ class User extends Authenticatable
         return $this->hasMany(Payment::class);
     }
 
+    public function verifiedAccounts(): User|HasMany
+    {
+        return $this->hasMany(VerifiedAccount::class);
+    }
+
+    public function smsBalances()
+    {
+        return $this->hasMany(SmsBalance::class);
+    }
+
+    // Optionally, get active SMS balance for a specific office
+    public function activeSmsForOffice($ofisiId)
+    {
+        return $this->smsBalances()
+            ->where('ofisi_id', $ofisiId)
+            ->where('status', 'active')
+            ->whereDate('expires_at', '>=', now())
+            ->first();
+    }
+
+
     /** --------------------
      *  Custom Methods
      *  -------------------- */

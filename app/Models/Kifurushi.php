@@ -18,6 +18,12 @@ class Kifurushi extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function verifiedAccounts(): HasMany|Kifurushi
+    {
+        return $this->hasMany(VerifiedAccount::class);
+    }
+
+
     protected $fillable = [
         'name',
         'description',

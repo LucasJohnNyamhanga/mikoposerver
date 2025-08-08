@@ -20,6 +20,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(false);
             $table->boolean('is_popular')->default(false);
             $table->text('offer')->nullable();
+            $table->boolean('special')->default(false);
 
             $table->timestamps();
 
