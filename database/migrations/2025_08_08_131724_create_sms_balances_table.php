@@ -21,7 +21,9 @@ return new class extends Migration
             $table->date('start_date');
             $table->date('expires_at');
 
-            $table->string('status', 20)->default('active');
+            $table->string('status', 20)->default('pending');
+            $table->string('sender_id')->nullable();
+            $table->string('phone')->nullable();
 
             $table->timestamps();
 

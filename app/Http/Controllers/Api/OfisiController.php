@@ -211,67 +211,30 @@ class OfisiController extends Controller
             return $ofisi;
         }
 
-        $userId = $this->auth_user->id;
+        // Get all user IDs in the authenticated user's current office
+        $userIdsInOfisi = \DB::table('user_ofisis')
+            ->where('ofisi_id', $ofisi->id)
+            ->pluck('user_id');
 
-        $user = User::with([
-            'ofisis' => function ($query) {
-                $query
-                    ->select('ofisis.*')
-                    ->withCount('customers')
-                    ->withCount([
-                        'acceptedUsers as users_count',
-                    ])
-                    ->withCount([
-                        'loans as active_loans_count' => function ($q) {
-                            $q->whereIn('status', ['approved', 'defaulted']);
-                        }
-                    ])
-                    ->withSum([
-                        'loans as total_amount_loaned' => function ($q) {
-                            $q->whereIn('status', ['approved', 'defaulted']);
-                        }
-                    ], 'amount')
-                    ->withSum([
-                        'loans as amount_defaulted' => function ($q) {
-                            $q->where('status', 'defaulted');
-                        }
-                    ], 'amount');
-            }
-        ])->findOrFail($userId);
+        // Find all active kifurushi owners in this office
+        $activeOwners = \App\Models\KifurushiPurchase::whereIn('user_id', $userIdsInOfisi)
+            ->where('status', 'active')
+            ->pluck('user_id')
+            ->unique()
+            ->values();
 
-        $ofisis = $user->ofisis->map(function ($ofisi) {
-            return [
-                'id' => $ofisi->id,
-                'jina' => $ofisi->jina,
-                'mkoa' => $ofisi->mkoa,
-                'wilaya' => $ofisi->wilaya,
-                'kata' => $ofisi->kata,
-                'customers_count' => $ofisi->customers_count,
-                'users_count' => $ofisi->users_count,
-                'active_loans_count' => $ofisi->active_loans_count,
-                'total_amount_loaned' => (float) $ofisi->total_amount_loaned,
-                'amount_defaulted' => (float) $ofisi->amount_defaulted,
-                'position_id' => $ofisi->pivot?->position_id,
-            ];
-        });
-
-        return response()->json($ofisis);
-    }
-
-    public function getValidOfisi(OfisiService $ofisiService): JsonResponse
-    {
-        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof JsonResponse) {
-            return $ofisi;
+        if ($activeOwners->isEmpty()) {
+            return response()->json([
+                'message' => 'Hakuna kifurushi hai katika ofisi hii, nunua kifurushi kuendelea.'
+            ], 400);
         }
 
-        $userId = $this->auth_user->id;
-
-        $user = User::with([
+        // Load all users with their verified ofisis and related counts/sums
+        $owners = User::with([
             'ofisis' => function ($query) {
                 $query
                     ->select('ofisis.*')
-                    ->whereHas('verifiedAccount') // Only include ofisis that have a verifiedAccount relationship
+                    ->whereHas('verifiedAccount')
                     ->withCount('customers')
                     ->withCount([
                         'acceptedUsers as users_count',
@@ -292,26 +255,18 @@ class OfisiController extends Controller
                         }
                     ], 'amount');
             }
-        ])->findOrFail($userId);
+        ])->whereIn('id', $activeOwners)
+            ->get();
 
-        $ofisis = $user->ofisis->map(function ($ofisi) {
-            return [
-                'id' => $ofisi->id,
-                'jina' => $ofisi->jina,
-                'mkoa' => $ofisi->mkoa,
-                'wilaya' => $ofisi->wilaya,
-                'kata' => $ofisi->kata,
-                'customers_count' => $ofisi->customers_count,
-                'users_count' => $ofisi->users_count,
-                'active_loans_count' => $ofisi->active_loans_count,
-                'total_amount_loaned' => (float) $ofisi->total_amount_loaned,
-                'amount_defaulted' => (float) $ofisi->amount_defaulted,
-                'position_id' => $ofisi->pivot?->position_id,
-            ];
-        });
+        // Merge all ofisis into one collection
+        $mergedUser = $owners->first()->replicate();
+        $mergedUser->ofisis = $owners->flatMap->ofisis->unique('id')->values();
 
-        return response()->json($ofisis);
+        return $this->ofisiSummaryResults($mergedUser);
     }
+
+
+
 
 
     public function getMwamala(OfisiRequest $request, OfisiService $ofisiService)
@@ -875,6 +830,31 @@ class OfisiController extends Controller
                 $this->sendNotification($messageContent, $user['id'], $senderId, $ofisiId);
             }
         }
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Model|\Illuminate\Database\Eloquent\Collection|array|User|\LaravelIdea\Helper\App\Models\_IH_User_C|null $user
+     * @return JsonResponse
+     */
+    public function ofisiSummaryResults(\Illuminate\Database\Eloquent\Model|\Illuminate\Database\Eloquent\Collection|array|User|\LaravelIdea\Helper\App\Models\_IH_User_C|null $user): JsonResponse
+    {
+        $ofisis = $user->ofisis->map(function ($ofisi) {
+            return [
+                'id' => $ofisi->id,
+                'jina' => $ofisi->jina,
+                'mkoa' => $ofisi->mkoa,
+                'wilaya' => $ofisi->wilaya,
+                'kata' => $ofisi->kata,
+                'customers_count' => $ofisi->customers_count,
+                'users_count' => $ofisi->users_count,
+                'active_loans_count' => $ofisi->active_loans_count,
+                'total_amount_loaned' => (float)$ofisi->total_amount_loaned,
+                'amount_defaulted' => (float)$ofisi->amount_defaulted,
+                'position_id' => $ofisi->pivot?->position_id,
+            ];
+        });
+
+        return response()->json($ofisis);
     }
 
     private function sendNotificationKwaViongoziWengine($messageContent, $ofisiId, $userId)

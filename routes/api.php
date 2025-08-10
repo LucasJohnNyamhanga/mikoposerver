@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\MiamalaController;
 use App\Http\Controllers\Api\OfisiController;
 use App\Http\Controllers\Api\TransactionChangeController;
 use App\Http\Controllers\Api\UploadController;
+use App\Http\Controllers\Api\VerifiedAccount;
 use App\Http\Controllers\Api\VifurushiController;
 use App\Http\Controllers\Api\ZenoPayController;
 use App\Http\Controllers\Api\ZenoPayWebhookController;
@@ -71,7 +72,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('getVifurushi', [VifurushiController::class, 'getVifurushi']);
     Route::get('paymentStatus', [VifurushiController::class, 'paymentStatus']);
     Route::get('getMessages', [MessageController::class, 'getMessages']);
-    Route::get('getValidOfisi', [OfisiController::class, 'getValidOfisi']);
+    Route::get('getValidOfisi', [VerifiedAccount::class, 'getValidOfisi']);
+    Route::post('addVerifiedOfisi', [VerifiedAccount::class, 'addVerifiedOfisi']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

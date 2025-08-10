@@ -6,14 +6,14 @@ use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-
 class VerifiedAccount extends Model
 {
-
     protected $fillable = [
         'user_id',
         'kifurushi_id',
         'ofisi_id',
+        'ofisi_changes_count',
+        'ofisi_creation_count',
     ];
 
     public function user(): BelongsTo
@@ -31,35 +31,46 @@ class VerifiedAccount extends Model
         return $this->belongsTo(Ofisi::class);
     }
 
-
-
     protected static function booted(): void
     {
-        static::creating(function ($verified) {
+        static::creating(function ($model) {
             // Enforce only if the kifurushi is active
-            if (!$verified->kifurushi || !$verified->kifurushi->is_active) {
+            if (!$model->kifurushi || !$model->kifurushi->is_active) {
                 throw new Exception("Huwezi badili ofisi, huna kifurushi hai.");
             }
 
-            // Get new ofisi (to be assigned)
-            $ofisi = Ofisi::with('kifurushiPurchases')->find($verified->ofisi_id);
-
+            $ofisi = Ofisi::with('kifurushiPurchases')->find($model->ofisi_id);
             if (!$ofisi) {
                 throw new Exception('Ofisi hii haijapatikana, inawezekana imefutwa.');
             }
+
+            $activePurchase = $ofisi->kifurushiPurchases()
+                ->where('status', 'active')
+                ->with('kifurushi')
+                ->latest()
+                ->first();
+
+            $numberOfChanges = $activePurchase->kifurushi->ofisi_creation_count ?? 0;
+
+            $hasKifurushiHistory = $ofisi->kifurushiPurchases()->exists();
+
+            $maxChanges = $hasKifurushiHistory ? $numberOfChanges + 8 : $numberOfChanges + 5;
+
+            if (($model->ofisi_creation_count ?? 0) >= $maxChanges) {
+                throw new Exception("Umefikia kikomo cha kuongeza ofisi, umeongeza mara {$maxChanges}.");
+            }
+
+            $model->ofisi_creation_count = ($model->ofisi_creation_count ?? 0) + 1;
         });
 
         static::updating(function ($model) {
-            // Only check if ofisi_id is changing
             if ($model->isDirty('ofisi_id')) {
-                // Get new ofisi (to be assigned)
                 $ofisi = Ofisi::with(['kifurushiPurchases.kifurushi'])->find($model->ofisi_id);
 
                 if (!$ofisi) {
                     throw new Exception('Ofisi hii haijapatikana, inawezekana imefutwa.');
                 }
 
-                // Check if the new ofisi has active kifurushi
                 $activePurchase = $ofisi->kifurushiPurchases()
                     ->where('status', 'active')
                     ->with('kifurushi')
@@ -67,26 +78,30 @@ class VerifiedAccount extends Model
                     ->first();
 
                 if (!$activePurchase || !$activePurchase->kifurushi || !$activePurchase->kifurushi->is_active) {
-                    throw new Exception("Tumeshindwa badili ofisi, huna kifurushi hai");
+                    throw new Exception("Tumeshindwa badili ofisi, huna kifurushi hai.");
                 }
 
-                // ✅ Only proceed if special is set (true or has content)
+                $numberOfOfisi = $activePurchase->kifurushi->number_of_offices ?? 0;
+
+                $hasKifurushiHistory = $ofisi->kifurushiPurchases()->exists();
+
                 if (!empty($activePurchase->kifurushi->special)) {
-                    // Check modification limit based on ofisi history
-                    $hasKifurushiHistory = $ofisi->kifurushiPurchases()->exists();
-                    $maxChanges = $hasKifurushiHistory ? 8 : 4;
-
-                    if ($model->ofisi_changes_count >= $maxChanges) {
-                        throw new Exception("Umefikia kikomo cha kubadili ofisi, umebadili mara {$maxChanges}.");
-                    }
-
-                    // Increment count
-                    $model->ofisi_changes_count += 1;
+                    $maxChanges = $hasKifurushiHistory ? $numberOfOfisi + 8 : $numberOfOfisi + 5;
+                } else {
+                    // Using floor to ensure integer result
+                    $maxChanges = $hasKifurushiHistory
+                        ? $numberOfOfisi + floor($numberOfOfisi / 2)
+                        : $numberOfOfisi + floor($numberOfOfisi / 4);
                 }
+
+                if (($model->ofisi_changes_count ?? 0) >= $maxChanges) {
+                    throw new Exception("Umefikia kikomo cha kubadili ofisi, umebadili mara {$maxChanges}.");
+                }
+
+                $model->ofisi_changes_count = ($model->ofisi_changes_count ?? 0) + 1;
             }
         });
     }
-
 
     public function hasActiveKifurushi(): bool
     {
@@ -95,7 +110,7 @@ class VerifiedAccount extends Model
 
     public function canModifyOfisi(): bool
     {
-        return $this->ofisi_changes_count <= 5;
+        // Adjust limit as needed, or make dynamic
+        return ($this->ofisi_changes_count ?? 0) <= 5;
     }
-
 }

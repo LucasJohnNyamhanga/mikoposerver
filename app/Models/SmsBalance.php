@@ -3,12 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SmsBalance extends Model
 {
-    use HasFactory;
 
     protected $fillable = [
         'user_id',
@@ -20,7 +19,7 @@ class SmsBalance extends Model
         'status',
     ];
 
-    protected $dates = [
+    protected array $dates = [
         'start_date',
         'expires_at',
         'created_at',
@@ -33,12 +32,12 @@ class SmsBalance extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function ofisi()
+    public function ofisi(): BelongsTo
     {
         return $this->belongsTo(Ofisi::class);
     }

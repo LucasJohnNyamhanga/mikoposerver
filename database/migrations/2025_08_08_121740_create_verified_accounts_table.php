@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignId('kifurushi_id')->constrained()->onDelete('cascade');
             $table->foreignId('ofisi_id')->constrained()->onDelete('cascade');
             $table->unsignedInteger('ofisi_changes_count')->default(0);
+            $table->unsignedInteger('ofisi_creation_count')->default(0);
             $table->timestamps();
 
             $table->index(['user_id', 'kifurushi_id', 'ofisi_id']);
