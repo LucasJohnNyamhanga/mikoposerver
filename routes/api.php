@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DhamanaController;
 use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\MiamalaController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OfisiController;
 use App\Http\Controllers\Api\TransactionChangeController;
 use App\Http\Controllers\Api\UploadController;
@@ -74,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('getMessages', [MessageController::class, 'getMessages']);
     Route::get('getValidOfisi', [VerifiedAccount::class, 'getValidOfisi']);
     Route::post('addVerifiedOfisi', [VerifiedAccount::class, 'addVerifiedOfisi']);
+    Route::get('getNotifications', [NotificationController::class, 'getNotifications']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

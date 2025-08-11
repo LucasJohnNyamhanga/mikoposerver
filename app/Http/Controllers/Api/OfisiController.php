@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OfisiRequest;
 use App\Models\Customer;
+use App\Models\KifurushiPurchase;
 use App\Models\Loan;
 use App\Models\Mabadiliko;
 use App\Models\Message;
+use App\Models\Notification;
 use App\Models\Ofisi;
 use App\Models\Position;
 use App\Models\Transaction;
@@ -57,29 +59,26 @@ class OfisiController extends Controller
         }
 
         $user = $this->auth_user;
+        $ofisiTargetId = $ofisi->id;
 
         // Update loan statuses
-        $this->updateLoanStatuses($ofisi->id);
+        $this->updateLoanStatuses($ofisiTargetId);
 
+        // Fetch Ofisi data with relations
         $ofisiYangu = Ofisi::with([
-            // All users + their unread messages sent to current user
             'users' => function ($query) use ($user) {
                 $query->with([
                     'receivedMessages' => function ($q) use ($user) {
                         $q->where('receiver_id', $user->id)
-                            ->where('status', 'unread') // Only unread messages
+                            ->where('status', 'unread')
                             ->with(['sender', 'receiver'])
                             ->latest();
                     }
                 ])->latest();
             },
-
-            // Customers in this office
             'customers' => function ($query) {
                 $query->latest();
             },
-
-            // Loans in this office
             'loans' => function ($query) {
                 $query->with([
                     'customers',
@@ -102,8 +101,6 @@ class OfisiController extends Controller
                 ])
                     ->latest();
             },
-
-            // All today's transactions
             'transactions' => function ($query) {
                 $query->with([
                     'user',
@@ -115,18 +112,116 @@ class OfisiController extends Controller
                     ->whereDate('created_at', now()->toDateString())
                     ->latest();
             },
-
-            // Loan types (static or dynamic depending on system)
             'ainamikopo'
         ])
-            ->where('id', $ofisi->id)
+            ->where('id', $ofisiTargetId)
             ->first();
 
+        // Then fetch info/other notifications excluding the main condition keys
+        $excludedKeys = ['sms_balance', 'kifurushi_expiry', 'kifurushi_expired'];
+
+        $infoNotifications = Notification::whereNotIn('condition_key', $excludedKeys)
+            ->where('is_active', true)
+            ->inRandomOrder()
+            ->get();
+
+// === Notification Logic ===
+        $notification = null;
+        $notifications = [];
+
+        // Step 1: Get all user IDs in this office
+        $userIdsInOfisi = DB::table('user_ofisis')
+            ->where('ofisi_id', $ofisiTargetId)
+            ->pluck('user_id');
+
+        if ($userIdsInOfisi->isNotEmpty()) {
+            // Step 2: Calculate total SMS balance
+            $totalSmsBalance = DB::table('sms_balances')
+                ->whereIn('user_id', $userIdsInOfisi)
+                ->where('status', 'active')
+                ->whereDate('expires_at', '>=', now())
+                ->selectRaw('SUM(allowed_sms - used_sms) as balance')
+                ->value('balance');
+
+            $totalSmsBalance = (int) $totalSmsBalance;
+
+            // Step 3: Determine notification based on SMS balance or kifurushi expiry
+            if ($totalSmsBalance <= 0) {
+                $notification = Notification::getPrioritized(1, 3, 'sms_balance')->first();
+            } elseif ($totalSmsBalance <= 10) {
+                $notification = Notification::getPrioritized(1, 2, 'sms_balance')->first();
+            } elseif ($totalSmsBalance <= 50) {
+                $notification = Notification::getPrioritized(1, 1, 'sms_balance')->first();
+            } else {
+                $activePurchase = KifurushiPurchase::whereIn('user_id', $userIdsInOfisi)
+                    ->where('status', 'active')
+                    ->latest('expires_at')
+                    ->first();
+
+                if (!$activePurchase) {
+                    $notification = Notification::getPrioritized(1, 3, 'kifurushi_expired')->first();
+                } else {
+                    $daysLeft = now()->diffInDays($activePurchase->expires_at, false);
+
+                    if ($daysLeft < 0) {
+                        $stage = 3;
+                    } elseif ($daysLeft < 3) {
+                        $stage = 2;
+                    } elseif ($daysLeft < 7) {
+                        $stage = 1;
+                    } else {
+                        $stage = null;
+                    }
+
+                    if ($stage !== null) {
+                        $notification = Notification::getPrioritized(1, $stage, 'kifurushi_expiry')->first();
+                    }
+                }
+            }
+        }
+
+        // Step 4: Fetch other info notifications excluding main keys, random order
+        $excludedKeys = ['sms_balance', 'kifurushi_expiry', 'kifurushi_expired'];
+
+        $infoNotifications = Notification::whereNotIn('condition_key', $excludedKeys)
+            ->where('is_active', true)
+            ->inRandomOrder()
+            ->limit(5)
+            ->get();
+
+        // Step 5: Prepare combined notifications list
+        if ($notification) {
+            $notifications[] = [
+                'id' => $notification->id,
+                'title' => $notification->title,
+                'message' => $notification->message,
+                'type' => $notification->type,
+                'stage' => $notification->stage,
+                'condition_key' => $notification->condition_key,
+                'image_url' => $notification->image_url,
+            ];
+        }
+
+        foreach ($infoNotifications as $info) {
+            $notifications[] = [
+                'id' => $info->id,
+                'title' => $info->title,
+                'message' => $info->message,
+                'type' => $info->type,
+                'stage' => $info->stage,
+                'condition_key' => $info->condition_key,
+                'image_url' => $info->image_url,
+            ];
+        }
+
+        // Return final JSON response
         return response()->json([
             'user_id' => $user->id,
             'ofisi' => $ofisiYangu,
+            'notifications' => $notifications,
         ]);
     }
+
 
 
     public function getMapato(OfisiRequest $request, OfisiService $ofisiService)
@@ -217,7 +312,7 @@ class OfisiController extends Controller
             ->pluck('user_id');
 
         // Find all active kifurushi owners in this office
-        $activeOwners = \App\Models\KifurushiPurchase::whereIn('user_id', $userIdsInOfisi)
+        $activeOwners = KifurushiPurchase::whereIn('user_id', $userIdsInOfisi)
             ->where('status', 'active')
             ->pluck('user_id')
             ->unique()

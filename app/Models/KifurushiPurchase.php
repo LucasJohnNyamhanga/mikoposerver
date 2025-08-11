@@ -4,7 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int $kifurushi_id
+ * @property string $status
+ * @property Carbon|null $start_date
+ * @property Carbon|null $end_date
+ * @property bool $is_active
+ * @property Carbon|null $approved_at
+ * @property string $reference
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ *
+ * @property User $user
+ * @property Kifurushi $kifurushi
+ * @property Ofisi $ofisi
+ */
 class KifurushiPurchase extends Model
 {
     protected $fillable = [
@@ -39,7 +57,6 @@ class KifurushiPurchase extends Model
     {
         return $this->belongsTo(Ofisi::class);
     }
-
 
     public function payment()
     {
