@@ -30,7 +30,6 @@ class NotificationController extends Controller
             return $ofisi; // error or no office found response
         }
 
-        $user = auth()->user();
         $ofisiTargetId = $ofisi->id;
 
         // === Notification Logic ===
@@ -62,14 +61,14 @@ class NotificationController extends Controller
                 $notification = Notification::getPrioritized(1, 1, 'sms_balance')->first();
             } else {
                 $activePurchase = KifurushiPurchase::whereIn('user_id', $userIdsInOfisi)
-                    ->where('status', 'active')
-                    ->latest('expires_at')
+                    ->where('status', 'approved') // changed from 'active' to match Kifurushi logic
+                    ->latest('end_date')
                     ->first();
 
                 if (!$activePurchase) {
                     $notification = Notification::getPrioritized(1, 3, 'kifurushi_expired')->first();
                 } else {
-                    $daysLeft = now()->diffInDays($activePurchase->expires_at, false);
+                    $daysLeft = now()->diffInDays($activePurchase->end_date, false);
 
                     if ($daysLeft < 0) {
                         $stage = 3;
@@ -127,6 +126,4 @@ class NotificationController extends Controller
             'notifications' => $notifications,
         ]);
     }
-
-
 }

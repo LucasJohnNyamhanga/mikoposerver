@@ -12,32 +12,31 @@ return new class extends Migration
         Schema::create('notifications', function (Blueprint $table) {
             $table->id();
 
-            // Notification content
             $table->string('title');
             $table->text('message');
-            $table->string('type', 50)->default('info'); // e.g., info, warning, error, sms_balance, kifurushi_expiry
-            $table->integer('stage')->default(1); // e.g., 1=reminder, 2=warning, 3=urgent
+            $table->string('type', 50)->default('tip'); // 'tip' includes info, warning, error; others: sms, vifurushi
+            $table->integer('stage')->default(1); // 1=reminder, 2=warning, 3=urgent
 
-            // Condition key to identify notification category or trigger
             $table->string('condition_key', 50)->nullable()->index();
 
-            // Optional image URL for notification
             $table->string('image_url')->nullable();
 
-            // Whether notification is active or archived
             $table->boolean('is_active')->default(true);
 
             $table->timestamps();
 
-            // Indexes for efficient filtering
             $table->index(['type', 'stage', 'is_active']);
         });
 
-        // PostgreSQL check constraint for 'type' field, optional
+        // PostgreSQL CHECK constraint with combined tips
         DB::statement("
             ALTER TABLE notifications
             ADD CONSTRAINT notification_type_check
-            CHECK (type IN ('info', 'warning', 'error', 'sms_balance', 'kifurushi_expiry'))
+            CHECK (type IN (
+                'tip',        -- combined info, warning, error
+                'sms',
+                'vifurushi'
+            ))
         ");
     }
 

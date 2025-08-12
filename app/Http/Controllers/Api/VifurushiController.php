@@ -15,7 +15,9 @@ class VifurushiController extends Controller
     public function getVifurushi(): JsonResponse
     {
         try {
-            $vifurushi = Kifurushi::where('is_active', true)->get();
+            $vifurushi = Kifurushi::where('is_active', true)
+                ->where('special', false)
+                ->get();
 
             return response()->json([
                 'status' => 'success',
@@ -28,6 +30,7 @@ class VifurushiController extends Controller
             ], 500);
         }
     }
+
 
     public function paymentStatus(VifurushiRequest $request): JsonResponse
     {
