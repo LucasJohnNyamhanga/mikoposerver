@@ -76,35 +76,29 @@ class OfisiController extends Controller
                     }
                 ])->latest();
             },
-            'customers' => function ($query) {
-                $query->latest();
-            },
+            'customers' => fn($q) => $q->latest(),
             'loans' => function ($query) {
                 $query->with([
                     'customers',
                     'user',
-                    'transactions' => function ($q) {
-                        $q->with(['user','approver','creator','customer'])
-                            ->where('status', 'completed')
-                            ->latest();
-                    },
+                    'transactions' => fn($q) => $q->with(['user','approver','creator','customer'])
+                        ->where('status', 'completed')
+                        ->latest(),
                     'wadhamini',
                     'dhamana',
-                    'mabadiliko' => function ($q) { $q->latest(); }
+                    'mabadiliko' => fn($q) => $q->latest()
                 ])->latest();
             },
-            'transactions' => function ($query) {
-                $query->with(['user','approver','creator','customer'])
-                    ->where('status', 'completed')
-                    ->whereDate('created_at', now()->toDateString())
-                    ->latest();
-            },
+            'transactions' => fn($q) => $q->with(['user','approver','creator','customer'])
+                ->where('status', 'completed')
+                ->whereDate('created_at', now()->toDateString())
+                ->latest(),
             'ainamikopo'
         ])->where('id', $ofisiTargetId)->first();
 
         $notifications = [];
 
-        // Step 1: Get all user IDs in this office
+        // Get all user IDs in this office
         $userIdsInOfisi = DB::table('user_ofisis')
             ->where('ofisi_id', $ofisiTargetId)
             ->pluck('user_id');
@@ -113,16 +107,53 @@ class OfisiController extends Controller
         $activePurchase = null;
 
         if ($userIdsInOfisi->isNotEmpty()) {
-            // Step 2: Calculate total SMS balance
-            $totalSmsBalance = DB::table('sms_balances')
+            // Calculate total SMS balance
+            $totalSmsBalance = (int) DB::table('sms_balances')
                 ->whereIn('user_id', $userIdsInOfisi)
                 ->where('status', 'active')
                 ->whereDate('expires_at', '>=', now())
                 ->selectRaw('SUM(allowed_sms - used_sms) as balance')
                 ->value('balance');
-            $totalSmsBalance = (int) $totalSmsBalance;
 
-            // Step 3: Determine SMS notification
+            // --- Step 1: Kifurushi notification first ---
+            $activePurchase = KifurushiPurchase::with('kifurushi')
+                ->whereIn('user_id', $userIdsInOfisi)
+                ->where('status', 'approved')
+                ->latest('end_date')
+                ->first();
+
+            if (!$activePurchase) {
+                $kifurushiNotification = Notification::getPrioritized(1, 3, 'kifurushi_expired')->first();
+            } else {
+                $daysLeft = now()->diffInDays($activePurchase->end_date, false);
+                $stage = null;
+
+                if ($daysLeft < 0) {
+                    $stage = 3;
+                } elseif ($daysLeft < 3) {
+                    $stage = 2;
+                } elseif ($daysLeft < 7) {
+                    $stage = 1;
+                }
+
+                $kifurushiNotification = $stage !== null
+                    ? Notification::getPrioritized(1, $stage, 'kifurushi_expiry')->first()
+                    : null;
+            }
+
+            if ($kifurushiNotification) {
+                $notifications[] = [
+                    'id' => $kifurushiNotification->id,
+                    'title' => $kifurushiNotification->title,
+                    'message' => $kifurushiNotification->message,
+                    'type' => $kifurushiNotification->type,
+                    'stage' => $kifurushiNotification->stage,
+                    'condition_key' => $kifurushiNotification->condition_key,
+                    'image_url' => $kifurushiNotification->image_url,
+                ];
+            }
+
+            // --- Step 2: SMS notification second ---
             if ($totalSmsBalance <= 0) {
                 $smsNotification = Notification::getPrioritized(1, 3, 'sms_balance')->first();
             } elseif ($totalSmsBalance <= 20) {
@@ -144,52 +175,10 @@ class OfisiController extends Controller
                     'image_url' => $smsNotification->image_url,
                 ];
             }
-
-            // Step 4: Kifurushi notification logic
-            $activePurchase = KifurushiPurchase::with('kifurushi')
-                ->whereIn('user_id', $userIdsInOfisi)
-                ->where('status', 'approved')
-                ->latest('end_date')
-                ->first();
-
-
-            if (!$activePurchase) {
-                $kifurushiNotification = Notification::getPrioritized(1, 3, 'kifurushi_expired')->first();
-            } else {
-                $daysLeft = now()->diffInDays($activePurchase->end_date, false);
-                $stage = null;
-
-                if ($daysLeft < 0) {
-                    $stage = 3;
-                } elseif ($daysLeft < 3) {
-                    $stage = 2;
-                } elseif ($daysLeft < 7) {
-                    $stage = 1;
-                }
-
-                if ($stage !== null) {
-                    $kifurushiNotification = Notification::getPrioritized(1, $stage, 'kifurushi_expiry')->first();
-                } else {
-                    $kifurushiNotification = null;
-                }
-            }
-
-            if (isset($kifurushiNotification) && $kifurushiNotification) {
-                $notifications[] = [
-                    'id' => $kifurushiNotification->id,
-                    'title' => $kifurushiNotification->title,
-                    'message' => $kifurushiNotification->message,
-                    'type' => $kifurushiNotification->type,
-                    'stage' => $kifurushiNotification->stage,
-                    'condition_key' => $kifurushiNotification->condition_key,
-                    'image_url' => $kifurushiNotification->image_url,
-                ];
-            }
         }
 
-        // Step 5: Fetch other info notifications excluding main keys, random order
+        // --- Step 3: Other info notifications ---
         $excludedKeys = ['sms_balance', 'kifurushi_expiry', 'kifurushi_expired'];
-
         $infoNotifications = Notification::whereNotIn('condition_key', $excludedKeys)
             ->where('is_active', true)
             ->inRandomOrder()
@@ -208,7 +197,6 @@ class OfisiController extends Controller
             ];
         }
 
-        // Return final JSON response including total SMS balance and latest active Kifurushi
         return response()->json([
             'user_id' => $user->id,
             'ofisi' => $ofisiYangu,
@@ -217,9 +205,7 @@ class OfisiController extends Controller
             'notifications' => $notifications,
         ]);
     }
-
-
-
+    
     public function getMapato(OfisiRequest $request, OfisiService $ofisiService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
