@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Throwable;
 
 class ZenoPayController extends Controller
 {
@@ -31,6 +32,7 @@ class ZenoPayController extends Controller
             'kifurushiId' => 'required|exists:kifurushis,id',
             'buyerEmail' => 'nullable|email',
             'buyerName' => 'nullable|string|max:100',
+            'smsAmount' => 'nullable|numeric',
         ]);
 
         if ($validator->fails()) {
@@ -44,7 +46,7 @@ class ZenoPayController extends Controller
 
         $buyerEmail = $request->buyerEmail ?? 'datasofttanzania@gmail.com';
         $buyerName = $request->buyerName ?? 'Anonymous User';
-        $webhookUrl = env('ZENOPAY_CALLBACK_URL');
+        $webhookUrl = config('services.zenopay.webhook_url');
 
         try {
             // Create payment via ZenoPay API
@@ -60,7 +62,7 @@ class ZenoPayController extends Controller
             $channel = $this->getMtandaoFromNumber($request->mobile);
 
             // Determine ofisi_id, e.g. from user's activeOfisi relation or fallback
-            $ofisiId = null;
+
             if ($user->relationLoaded('activeOfisi') && $user->activeOfisi) {
                 $ofisiId = $user->activeOfisi->ofisi_id ?? null;
             } else {
@@ -79,6 +81,7 @@ class ZenoPayController extends Controller
                 'user_id'       => $user->id,
                 'ofisi_id'      => $ofisiId,
                 'channel'       => $channel,
+                'sms_amount'    => $request->smsAmount, // NEW
             ]);
 
             Log::info('ZenoPay initiated successfully', [
@@ -98,7 +101,7 @@ class ZenoPayController extends Controller
                     'payment_id' => $payment->id,
                 ],
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('ZenoPay initiation failed', [
                 'reference' => $request->reference ?? null,
                 'error' => $e->getMessage(),

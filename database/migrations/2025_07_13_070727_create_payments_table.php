@@ -28,6 +28,7 @@ return new class extends Migration
             $table->string('channel')->nullable();               // e.g., MPESA-TZ
             $table->string('phone')->nullable();                 // Buyer phone number
             $table->decimal('amount', 12, 2);
+            $table->unsignedInteger('sms_amount')->nullable();
 
             $table->smallInteger('retries_count')->default(0);
             $table->timestamp('next_check_at')->nullable();
