@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $paid_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property mixed $sms_amount
  */
 
 class Payment extends Model
