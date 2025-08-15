@@ -24,6 +24,7 @@ return new class extends Migration
             $table->integer('duration_in_days')->default(30);
 
             $table->decimal('price', 10, 2)->default(0);
+            $table->integer('sms', 10, 2)->default(0);
             $table->boolean('is_active')->default(false);
             $table->boolean('is_popular')->default(false);
             $table->text('offer')->nullable();

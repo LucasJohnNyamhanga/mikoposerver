@@ -205,7 +205,7 @@ class OfisiController extends Controller
             'notifications' => $notifications,
         ]);
     }
-    
+
     public function getMapato(OfisiRequest $request, OfisiService $ofisiService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
