@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use LaravelIdea\Helper\App\Models\_IH_User_C;
 
-class VerifiedAccount extends Controller
+class VerifiedAccountController extends Controller
 {
 
 
@@ -70,7 +70,7 @@ class VerifiedAccount extends Controller
 
             // Find an active kifurushi purchase from any user in this office
             $activePurchase = KifurushiPurchase::whereIn('user_id', $userIdsInOfisi)
-                ->where('status', 'active')
+                ->where('status', 'approved')
                 ->latest()
                 ->first();
 
@@ -91,7 +91,7 @@ class VerifiedAccount extends Controller
 
             return response()->json([
                 'message' => 'Ofisi imeongezwa kikamilifu.'
-            ], 201);
+            ]);
         });
     }
 
@@ -107,7 +107,7 @@ class VerifiedAccount extends Controller
         $userId = auth()->user()->id;
 
         // Step 1: Get user IDs with active kifurushi
-        $activeUserIds = KifurushiPurchase::where('status', 'active')
+        $activeUserIds = KifurushiPurchase::where('status', 'approved')
             ->pluck('user_id')
             ->unique();
 

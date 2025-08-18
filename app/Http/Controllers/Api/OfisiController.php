@@ -295,7 +295,7 @@ class OfisiController extends Controller
 
         // Find all active kifurushi owners in this office
         $activeOwners = KifurushiPurchase::whereIn('user_id', $userIdsInOfisi)
-            ->where('status', 'active')
+            ->where('status', 'approved')
             ->pluck('user_id')
             ->unique()
             ->values();
@@ -311,7 +311,7 @@ class OfisiController extends Controller
             'ofisis' => function ($query) {
                 $query
                     ->select('ofisis.*')
-                    ->whereHas('verifiedAccount')
+                    //->whereHas('verifiedAccount')
                     ->withCount('customers')
                     ->withCount([
                         'acceptedUsers as users_count',

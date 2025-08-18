@@ -9,26 +9,43 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Create ENUM types first (PostgreSQL requirement)
-        DB::statement("CREATE TYPE muda_enum AS ENUM ('siku', 'wiki', 'mwezi')");
-        DB::statement("CREATE TYPE kifurushi_type_enum AS ENUM ('kifurushi', 'sms')");
+        // Create ENUM types only if they do not exist
+        DB::statement("DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'muda_enum') THEN
+                CREATE TYPE muda_enum AS ENUM ('siku', 'wiki', 'mwezi');
+            END IF;
+        END$$;");
+
+        DB::statement("DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'kifurushi_type_enum') THEN
+                CREATE TYPE kifurushi_type_enum AS ENUM ('kifurushi', 'sms');
+            END IF;
+        END$$;");
 
         Schema::create('kifurushis', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
             $table->text('description')->nullable();
-            $table->enum('muda', ['siku', 'wiki', 'mwezi'])->nullable()->default(null)
+
+            // PostgreSQL enum for duration
+            $table->enum('muda', ['siku', 'wiki', 'mwezi'])
+                ->nullable()
+                ->default(null)
                 ->comment('Duration type');
 
             $table->integer('number_of_offices')->default(1);
             $table->integer('duration_in_days')->default(30);
 
             $table->decimal('price', 10, 2)->default(0);
-            $table->integer('sms', 10, 2)->default(0);
+            $table->integer('sms')->default(0);
+
             $table->boolean('is_active')->default(false);
             $table->boolean('is_popular')->default(false);
             $table->text('offer')->nullable();
             $table->boolean('special')->default(false);
+
             $table->enum('type', ['kifurushi', 'sms'])->nullable();
 
             $table->timestamps();
@@ -43,7 +60,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('kifurushis');
-        DB::statement("DROP TYPE IF EXISTS muda_enum");
-        DB::statement("DROP TYPE IF EXISTS kifurushi_type_enum");
+
+        // Drop types safely
+        DB::statement("DROP TYPE IF EXISTS muda_enum CASCADE");
+        DB::statement("DROP TYPE IF EXISTS kifurushi_type_enum CASCADE");
     }
 };
