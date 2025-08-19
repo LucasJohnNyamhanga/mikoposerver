@@ -11,16 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('verified_accounts', function (Blueprint $table) {
+        Schema::create('ofisi_changes', function (Blueprint $table) {
             $table->id();
 
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('kifurushi_id')->constrained()->onDelete('cascade');
-            $table->foreignId('ofisi_id')->constrained()->onDelete('cascade');
+            $table->unsignedInteger('ofisi_changes_count')->default(0);
+            $table->unsignedInteger('ofisi_creation_count')->default(0);
             $table->timestamps();
 
-            $table->index(['user_id', 'kifurushi_id', 'ofisi_id']);
-            $table->unique(['user_id', 'ofisi_id']);
+            $table->index(['user_id', 'kifurushi_id']);
+            $table->unique(['user_id', 'kifurushi_id']);
         });
     }
 
@@ -29,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('verified_accounts');
+        Schema::dropIfExists('ofisi_changes');
     }
 };

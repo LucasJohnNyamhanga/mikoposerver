@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\KifurushiPurchase;
+use App\Models\OfisiChange;
 use App\Models\User;
 use App\Models\VerifiedAccount as VerifiedAccountModel;
 use App\Services\OfisiService;
@@ -16,10 +17,9 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use LaravelIdea\Helper\App\Models\_IH_User_C;
 
+
 class VerifiedAccountController extends Controller
 {
-
-
     public function addVerifiedOfisi(Request $request, OfisiService $ofisiService): JsonResponse
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
@@ -27,8 +27,8 @@ class VerifiedAccountController extends Controller
             return $ofisi;
         }
 
-        $user = Auth::user();
-        $cheoModel = $user->getCheoKwaOfisi($ofisi->id);
+        $currentUser = Auth::user();
+        $cheoModel = $currentUser->getCheoKwaOfisi($ofisi->id);
 
         if (!$cheoModel) {
             return response()->json([
@@ -36,7 +36,6 @@ class VerifiedAccountController extends Controller
             ], 403);
         }
 
-        // Validate input
         $validator = Validator::make($request->all(), [
             'ofisiId' => 'required|integer|exists:ofisis,id',
         ]);
@@ -44,49 +43,91 @@ class VerifiedAccountController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Taarifa za kutafutia ofisi hazijawasilishwa',
-                'errors'  => $validator->errors()
+                'errors' => $validator->errors()
             ], 400);
         }
 
         $ofisiTargetId = $request->input('ofisiId');
 
-        // Wrap the whole process in a transaction
-        return DB::transaction(function () use ($user, $ofisiTargetId) {
-            // Check if already verified
-            $alreadyVerified = VerifiedAccountModel::where('user_id', $user->id)
-                ->where('ofisi_id', $ofisiTargetId)
-                ->exists();
+        return DB::transaction(function () use ($currentUser, $ofisiTargetId) {
 
+            // Check if the office is already verified
+            $alreadyVerified = VerifiedAccount::where('ofisi_id', $ofisiTargetId)->exists();
             if ($alreadyVerified) {
                 return response()->json([
                     'message' => 'Ofisi hii tayari imeshaongezwa, jaribu nyingine.'
                 ], 409);
             }
 
-            // Get all user IDs in this ofisi
+            // Get all user IDs in this office
             $userIdsInOfisi = DB::table('user_ofisis')
                 ->where('ofisi_id', $ofisiTargetId)
                 ->pluck('user_id');
 
-            // Find an active kifurushi purchase from any user in this office
-            $activePurchase = KifurushiPurchase::whereIn('user_id', $userIdsInOfisi)
+            // Check if current user has an active kifurushi
+            $activePurchase = KifurushiPurchase::where('user_id', $currentUser->id)
                 ->where('status', 'approved')
                 ->latest()
                 ->first();
 
+            $usedUserId = $currentUser->id;
+
+            // If not, check other office members
             if (!$activePurchase) {
-                return response()->json([
-                    'message' => 'Hakuna kifurushi hai katika ofisi hii, nunua kifurushi kuendelea.'
-                ], 400);
+                $activePurchase = KifurushiPurchase::whereIn('user_id', $userIdsInOfisi)
+                    ->where('status', 'approved')
+                    ->latest()
+                    ->first();
+
+                if ($activePurchase) {
+                    $usedUserId = $activePurchase->user_id;
+                } else {
+                    return response()->json([
+                        'message' => 'Hakuna kifurushi hai katika ofisi hii, nunua kifurushi kuendelea.'
+                    ], 400);
+                }
             }
 
-            // Create verified account for the owner of the kifurushi
-            VerifiedAccountModel::create([
-                'user_id'              => $activePurchase->user_id,
-                'kifurushi_id'         => $activePurchase->kifurushi_id,
-                'ofisi_id'             => $ofisiTargetId,
-                'ofisi_changes_count'  => 0,
-                'ofisi_creation_count' => 0,
+            $kifurushi = $activePurchase->kifurushi;
+
+            // Check kifurushi office limit
+            $currentCount = VerifiedAccount::where('user_id', $usedUserId)
+                ->where('kifurushi_id', $activePurchase->kifurushi_id)
+                ->count();
+
+            if ($currentCount >= $kifurushi->number_of_offices) {
+                return response()->json([
+                    'message' => 'Umeshafikia kiwango cha mwisho cha ofisi '.$kifurushi->number_of_offices.' cha kifurushi chako.'
+                ], 403);
+            }
+
+            // Track changes in OfisiChange table
+            $changes = OfisiChange::firstOrCreate(
+                [
+                    'user_id' => $usedUserId,
+                    'kifurushi_id' => $activePurchase->kifurushi_id
+                ],
+                [
+                    'ofisi_creation_count' => 0,
+                    'ofisi_changes_count' => 0
+                ]
+            );
+
+            $numberOfCreation = $changes->ofisi_creation_count;
+            $numberOfAllowedCreation = $kifurushi->number_of_offices + 5;
+
+            if ($numberOfCreation >= $numberOfAllowedCreation) {
+                throw new Exception("Umefikia kikomo cha kuongeza ofisi, umeongeza mara {$numberOfCreation}.");
+            }
+
+            // Increment creation count
+            $changes->increment('ofisi_creation_count');
+
+            // Create VerifiedAccount
+            VerifiedAccount::create([
+                'user_id' => $usedUserId,
+                'kifurushi_id' => $activePurchase->kifurushi_id,
+                'ofisi_id' => $ofisiTargetId,
             ]);
 
             return response()->json([
@@ -94,6 +135,8 @@ class VerifiedAccountController extends Controller
             ]);
         });
     }
+
+
 
     public function getValidOfisi(OfisiService $ofisiService): JsonResponse
     {

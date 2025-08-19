@@ -137,6 +137,12 @@ class User extends Authenticatable
             : null;
     }
 
+    public function ofisiChanges(): HasMany
+    {
+        return $this->hasMany(OfisiChange::class);
+    }
+
+
     /** --------------------
      *  Attributes
      *  -------------------- */

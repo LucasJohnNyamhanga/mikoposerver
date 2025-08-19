@@ -23,6 +23,11 @@ class Kifurushi extends Model
         return $this->hasMany(VerifiedAccount::class);
     }
 
+    public function ofisiChanges(): HasMany
+    {
+        return $this->hasMany(OfisiChange::class);
+    }
+
 
     protected $fillable = [
         'name',

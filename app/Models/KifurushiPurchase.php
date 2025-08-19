@@ -28,6 +28,7 @@ class KifurushiPurchase extends Model
     protected $fillable = [
         'user_id',
         'kifurushi_id',
+        'ofisi_id',
         'status',
         'start_date',
         'end_date',
