@@ -75,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('getMessages', [MessageController::class, 'getMessages']);
     Route::get('getValidOfisi', [VerifiedAccountController::class, 'getValidOfisi']);
     Route::post('addVerifiedOfisi', [VerifiedAccountController::class, 'addVerifiedOfisi']);
+    Route::post('removeVerifiedOfisi', [VerifiedAccountController::class, 'removeVerifiedOfisi']);
     Route::get('getNotifications', [NotificationController::class, 'getNotifications']);
 });
 

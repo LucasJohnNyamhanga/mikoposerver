@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\KifurushiPurchase;
 use App\Models\OfisiChange;
 use App\Models\User;
-use App\Models\VerifiedAccount as VerifiedAccountModel;
 use App\Services\OfisiService;
+use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use LaravelIdea\Helper\App\Models\_IH_User_C;
+use App\Models\VerifiedAccount;
 
 
 class VerifiedAccountController extends Controller
@@ -113,12 +114,7 @@ class VerifiedAccountController extends Controller
                 ]
             );
 
-            $numberOfCreation = $changes->ofisi_creation_count;
-            $numberOfAllowedCreation = $kifurushi->number_of_offices + 5;
 
-            if ($numberOfCreation >= $numberOfAllowedCreation) {
-                throw new Exception("Umefikia kikomo cha kuongeza ofisi, umeongeza mara {$numberOfCreation}.");
-            }
 
             // Increment creation count
             $changes->increment('ofisi_creation_count');
@@ -136,6 +132,100 @@ class VerifiedAccountController extends Controller
         });
     }
 
+    public function removeVerifiedOfisi(Request $request, OfisiService $ofisiService): JsonResponse
+    {
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) {
+            return $ofisi;
+        }
+
+        $currentUser = Auth::user();
+        $cheoModel = $currentUser->getCheoKwaOfisi($ofisi->id);
+
+        if (!$cheoModel) {
+            return response()->json([
+                'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kuondoa ofisi.'
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'ofisiId' => 'required|integer|exists:ofisis,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Taarifa za kutafutia ofisi hazijawasilishwa',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        $ofisiTargetId = $request->input('ofisiId');
+
+        return DB::transaction(function () use ($currentUser, $ofisiTargetId) {
+            // Check kama ofisi ipo kwenye VerifiedAccount
+            $verified = VerifiedAccount::where('ofisi_id', $ofisiTargetId)->first();
+            if (!$verified) {
+                return response()->json([
+                    'message' => 'Ofisi hii haipo kwenye orodha ya ofisi zilizothibitishwa.'
+                ], 404);
+            }
+
+            // Check kama user ana kifurushi hai
+            $activePurchase = KifurushiPurchase::where('user_id', $currentUser->id)
+                ->where('status', 'approved')
+                ->latest()
+                ->first();
+
+            $usedUserId = $currentUser->id;
+
+            if (!$activePurchase) {
+                $userIdsInOfisi = DB::table('user_ofisis')
+                    ->where('ofisi_id', $ofisiTargetId)
+                    ->pluck('user_id');
+
+                $activePurchase = KifurushiPurchase::whereIn('user_id', $userIdsInOfisi)
+                    ->where('status', 'approved')
+                    ->latest()
+                    ->first();
+
+                if ($activePurchase) {
+                    $usedUserId = $activePurchase->user_id;
+                } else {
+                    return response()->json([
+                        'message' => 'Hakuna kifurushi hai kinachohusiana na ofisi hii, huwezi kuiondoa.'
+                    ], 400);
+                }
+            }
+
+            // Update OfisiChange (track removals as "changes")
+            $changes = OfisiChange::firstOrCreate(
+                [
+                    'user_id' => $usedUserId,
+                    'kifurushi_id' => $activePurchase->kifurushi_id
+                ],
+                [
+                    'ofisi_creation_count' => 0,
+                    'ofisi_changes_count' => 0
+                ]
+            );
+            $kifurushi = $activePurchase->kifurushi;
+            $numberOfCreation = $changes->ofisi_changes_count;
+            $numberOfAllowedCreation = $kifurushi->number_of_offices + 5;
+
+            if ($numberOfCreation >= $numberOfAllowedCreation) {
+                throw new Exception("Umefikia kikomo cha kubadili ofisi, umebadili mara {$numberOfCreation}.");
+            }
+
+            $changes->increment('ofisi_changes_count');
+
+            // Futa verified account record
+            $verified->delete();
+
+            return response()->json([
+                'message' => 'Ofisi imeondolewa kikamilifu.'
+            ]);
+        });
+    }
 
 
     public function getValidOfisi(OfisiService $ofisiService): JsonResponse
