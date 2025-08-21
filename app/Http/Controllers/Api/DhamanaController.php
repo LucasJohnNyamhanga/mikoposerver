@@ -10,6 +10,8 @@ use App\Models\Loan;
 use App\Models\Message;
 use App\Models\Ofisi;
 use App\Models\UserOfisi;
+use App\Services\OfisiService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -17,169 +19,163 @@ use Illuminate\Validation\Rule as ValidationRule;
 
 class DhamanaController extends Controller
 {
-    public function sajiliDhamana(DhamanaRequest $request)
+    public function sajiliDhamana(DhamanaRequest $request, OfisiService $ofisiService)
     {
-        DB::beginTransaction();
+        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+        if ($ofisi instanceof JsonResponse) return $ofisi;
+
+        $ofisiId = $ofisi->id;
 
         try {
-        // Validate the incoming request
-            $validator = Validator::make($request->all(), [
-                'jina' => 'required|string|max:255',
-                'thamani' => 'required|numeric|min:0',
-                'maelezo' => 'required|string|max:255',
-                'picha' => 'required|string|max:255',
-                'loanId' => 'required|exists:loans,id',
-                'customerId' => 'required|exists:customers,id',
-                'ofisiId' => 'required|exists:ofisis,id',
-                'dhamanaIlipo' => ['required', ValidationRule::in(['ofisi', 'customer'])],
-            ]);
-
-            $appName = env('APP_NAME');
-            $helpNumber = env('APP_HELP');
-
-            // If validation fails, return a response with error messages
-            if ($validator->fails()) {
-
-                throw new \Exception("Jaza maeneo yote yaliyowazi kuendelea.");
-            }
+            DB::beginTransaction();
 
             $user = Auth::user();
+            if (!$user) throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada " . env('APP_HELP'));
 
-            if (!$user) {
-                throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
-            }
+            $loan = $request->loanId ? Loan::find($request->loanId) : null;
+            $mteja = $request->customerId ? Customer::find($request->customerId) : null;
 
-            $ofisi = Ofisi::find($request->ofisiId);
-
-            if (!$ofisi) {
-                throw new \Exception("Ofisi uliyoichagua haipo au imefutwa");
-            }
-
-            $loan = Loan::find($request->loanId);
-
-            if (!$loan) {
-                throw new \Exception("Mkopo ulio wasilisha haupo au umefutwa");
-            }
-
-            $mteja = Customer::find($request->customerId);
-            if (!$mteja) {
-                throw new \Exception("Mteja ulio mwasilisha hayupo au amefutwa");
-            }
-        
             $dhamana = Dhamana::create([
                 'jina' => $request->jina,
                 'thamani' => $request->thamani,
                 'maelezo' => $request->maelezo,
                 'picha' => $request->picha,
-                'loan_id' => $request->loanId,
-                'customer_id' => $request->customerId,
-                'ofisi_id' => $request->ofisiId,
-                'is_ofisi_owned' => false,
+                'loan_id' => $loan?->id,
+                'customer_id' => $mteja?->id,
+                'ofisi_id' => $ofisiId,
+                'is_ofisi_owned' => $request->dhamanaIlipo === 'ofisi' && $mteja === null,
                 'is_sold' => false,
                 'stored_at' => $request->dhamanaIlipo,
             ]);
 
-            $this->sendNotification(
-                    "Hongera, dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} imesajiliwa kikamilifu kwa ajili ya mkopo wa Tsh {$loan->amount}, kwa msaada piga simu namba {$helpNumber}, Asante.",
-                    $user->id,
-                    null,
-                    $ofisi->id,
-                );
+            $appName = env('APP_NAME');
+            $helpNumber = env('APP_HELP');
+            $mkopoAmount = $loan ? " kwa ajili ya mkopo wa Tsh {$loan->amount}" : "";
 
-                $this->sendNotificationKwaViongoziWengine("Dhamana mpya ya {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} imesajiliwa kikamilifu kwa ajili ya mkopo wa Tsh {$loan->amount}. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}, Asante.", $ofisi->id, $user->id);
+            if ($mteja) {
+                $this->sendNotification(
+                    "Hongera, dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} imesajiliwa kikamilifu{$mkopoAmount}, msaada piga simu {$helpNumber}.",
+                    $user->id, null, $ofisiId
+                );
+                $this->sendNotificationKwaViongoziWengine(
+                    "Dhamana mpya ya {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} imesajiliwa kikamilifu{$mkopoAmount}. Asante kwa kutumia {$appName}, msaada piga simu {$helpNumber}.",
+                    $ofisiId, $user->id
+                );
+            } else {
+                $this->sendNotification(
+                    "Hongera, dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} imesajiliwa kikamilifu, msaada piga simu {$helpNumber}.",
+                    $user->id, null, $ofisiId
+                );
+                $this->sendNotificationKwaViongoziWengine(
+                    "Dhamana mpya ya {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} imesajiliwa kikamilifu. Asante kwa kutumia {$appName}, msaada piga simu {$helpNumber}.",
+                    $ofisiId, $user->id
+                );
+            }
 
             DB::commit();
-
-            return response()->json(['message' => 'Dhamana ya mteja imesajiliwa kikamilifu'], 200);
+            return response()->json(['message' => 'Dhamana imesajiliwa kikamilifu'], 200);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            $baseUrl = env('APP_URL');
-            $imagePath = $request->picha;
-            
-            $filePathImage = trim(str_replace($baseUrl, '', $imagePath));
-            $filePath = public_path($filePathImage);
-            if (file_exists($filePath)) {
-                unlink($filePath);
+            if ($request->picha) {
+                $filePath = str_replace(env('APP_URL') . '/storage/', '', $request->picha);
+                Storage::disk(config('filesystems.default'))->delete($filePath);
             }
             return response()->json([
-                'message' => 'Hitilafu : ' . $e->getMessage()
+                'message' => 'Hitilafu imetokea wakati wa kusajili dhamana.',
+                'error' => $e->getMessage()
             ], 500);
         }
+
     }
+
 
     public function ondoaDhamana(DhamanaRequest $request)
     {
         DB::beginTransaction();
 
         try {
-        // Validate the incoming request
             $validator = Validator::make($request->all(), [
                 'dhamanaId' => 'required|exists:dhamanas,id',
             ]);
 
-            $appName = env('APP_NAME');
-            $helpNumber = env('APP_HELP');
-
-            // If validation fails, return a response with error messages
-            if ($validator->fails()) {
-
-                throw new \Exception("Jaza maeneo yote yaliyowazi kuendelea.");
-            }
+            if ($validator->fails()) throw new \Exception("Jaza maeneo yote yaliyowazi kuendelea.");
 
             $user = Auth::user();
-
-            if (!$user) {
-                throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
-            }
-
-            if (!$user->activeOfisi) {
-                throw new \Exception("Kuna Tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
-            }
-            // Retrieve the KikundiUser record to get the position and the Kikundi details
-            $userOfisi = UserOfisi::where('user_id', $user->id)
-                                ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-                                ->first();
-
-            $ofisi = $userOfisi->ofisi;
+            if (!$user) throw new \Exception("Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada " . env('APP_HELP'));
 
             $dhamana = Dhamana::find($request->dhamanaId);
+            if (!$dhamana) throw new \Exception("Dhamana haipo au tayari imeshafutwa");
 
-            if (!$dhamana) {
-                throw new \Exception("Dhamana unayohitaji kuifuta haijapatikana au tayari imeshafutwa");
-            }
+            $mteja = $dhamana->customer;
 
-            $mteja = Customer::find($dhamana->customer_id);
+            // Notifications
+            $messageUser = $mteja
+                ? "Hongera, dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} imefutwa kikamilifu."
+                : "Hongera, dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} imefutwa kikamilifu.";
 
-            $this->sendNotification(
-                "Hongera, dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} imefutwa kikamilifu, kwa msaada piga simu namba {$helpNumber}, Asante.",
-                $user->id,
-                null,
-                $ofisi->id,
-            );
+            $this->sendNotification($messageUser, $user->id, null, $dhamana->ofisi_id);
 
-            $this->sendNotificationKwaViongoziWengine("Dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} anayeomba mkopo, imefutwa kikamilifu. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}, Asante.", $ofisi->id, $user->id);
+            $messageLeaders = $mteja
+                ? "Dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} ya mteja {$mteja->jina} imefutwa kikamilifu."
+                : "Dhamana {$dhamana->jina} yenye thamani ya Tsh {$dhamana->thamani} imefutwa kikamilifu.";
 
-            $baseUrl = env('APP_URL');
+            $this->sendNotificationKwaViongoziWengine($messageLeaders, $dhamana->ofisi_id, $user->id);
+
+            // Delete file (local or S3)
             $imagePath = $dhamana->picha;
-            
-            $filePathImage = trim(str_replace($baseUrl, '', $imagePath));
-            $filePath = public_path($filePathImage);
-            if (file_exists($filePath)) {
-                unlink($filePath);
+            $filePath = trim(str_replace(env('APP_URL'), '', $imagePath));
+
+            if (Storage::exists($filePath)) {
+                Storage::delete($filePath);
             }
 
             $dhamana->delete();
-
             DB::commit();
 
-            return response()->json(['message' => 'Dhamana ya mteja imefutwa kikamilifu'], 200);
+            return response()->json(['message' => 'Dhamana imefutwa kikamilifu'], 200);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
             return response()->json([
-                'message' => 'Hitilafu : ' . $e->getMessage()
+                'message' => 'Hitilafu: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    public function getAllDhamana(OfisiService $ofisiService)
+    {
+        try {
+            $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+            if ($ofisi instanceof JsonResponse) {
+                return $ofisi;
+            }
+
+            $ofisiId = $ofisi->id;
+
+            $query = Dhamana::query();
+
+            if ($ofisiId) {
+                $query->where('ofisi_id', $ofisiId);
+            }
+
+            // Eager load related models and get latest
+            $dhamanas = $query->with(['customer', 'loan' => function ($query) {
+                    $query->with(['customers'])->latest();
+                },])
+                ->latest() // orders by created_at descending
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'dhamana' => $dhamanas
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hitilafu: ' . $e->getMessage()
             ], 500);
         }
     }

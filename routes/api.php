@@ -77,6 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('addVerifiedOfisi', [VerifiedAccountController::class, 'addVerifiedOfisi']);
     Route::post('removeVerifiedOfisi', [VerifiedAccountController::class, 'removeVerifiedOfisi']);
     Route::get('getNotifications', [NotificationController::class, 'getNotifications']);
+    Route::get('getDhamana', [DhamanaController::class, 'getAllDhamana']);
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);

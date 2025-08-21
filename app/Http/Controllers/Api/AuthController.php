@@ -396,7 +396,7 @@ class AuthController extends Controller
             );
 
             $this->sendNotification(
-                    "Hongera, umefanikiwa kufungua akaunti ya {$msajiliwa->jina_kamili} mwenye simu namba {$msajiliwa->mobile},, kwa sasa jina la mtumiajia analotumia ni {$msajiliwa->username} na neno lake la siri ni {$msajiliwa->password}. Kwa msaada piga simu namba {$helpNumber}, Asante.",
+                    "Hongera, umefanikiwa kufungua akaunti ya {$msajiliwa->jina_kamili} mwenye simu namba {$msajiliwa->mobile}, kwa sasa jina la mtumiajia analotumia ni {$msajiliwa->username} na neno lake la siri ni {$msajiliwa->password}. Kwa msaada piga simu namba {$helpNumber}, Asante.",
                     $user->id,
                     null,
                     $ofisi->id,
