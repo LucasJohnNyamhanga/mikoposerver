@@ -21,6 +21,7 @@ return new class extends Migration
             // Ownership & custody flags
             $table->boolean('is_ofisi_owned')->default(false); // TRUE = asset belongs to office
             $table->boolean('is_sold')->default(false);
+            $table->boolean('is_active')->default(true);
 
             // Use string instead of ENUM for PostgreSQL
             $table->string('stored_at', 20)->default('ofisi'); // 'ofisi' or 'customer'
