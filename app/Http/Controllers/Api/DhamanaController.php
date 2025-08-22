@@ -12,6 +12,7 @@ use App\Models\Ofisi;
 use App\Models\UserOfisi;
 use App\Services\OfisiService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -144,7 +145,7 @@ class DhamanaController extends Controller
     }
 
 
-    public function getAllDhamana(OfisiService $ofisiService)
+    public function getAllDhamana(Request $request, OfisiService $ofisiService)
     {
         try {
             $ofisi = $ofisiService->getAuthenticatedOfisiUser();
@@ -154,18 +155,35 @@ class DhamanaController extends Controller
 
             $ofisiId = $ofisi->id;
 
+            // Sanitize inputs
+            $filter = $request->query('filter'); // "dhamana", "mali", au null
+            $perPage = $request->query('per_page', 10); // default 10 kwa page
+            $page = $request->query('page', 1);
+
             $query = Dhamana::query();
 
             if ($ofisiId) {
                 $query->where('ofisi_id', $ofisiId);
             }
 
-            // Eager load related models and get latest
-            $dhamanas = $query->with(['customer', 'loan' => function ($query) {
-                    $query->with(['customers'])->latest();
-                },])
-                ->latest() // orders by created_at descending
-                ->get();
+            // Apply filters
+            if ($filter === 'dhamana') {
+                // Mali zilizo dhamana za wateja
+                $query->whereHas('customer');
+            } elseif ($filter === 'mali') {
+                // Mali za ofisi tu zisizo na wateja
+                $query->whereDoesntHave('customer');
+            }
+
+            // Load relations and paginate
+            $dhamanas = $query->with([
+                'customer',
+                'loan' => function ($q) {
+                    $q->with('customers')->latest();
+                },
+            ])
+                ->latest()
+                ->paginate($perPage, ['*'], 'page', $page);
 
             return response()->json([
                 'success' => true,
@@ -179,6 +197,7 @@ class DhamanaController extends Controller
             ], 500);
         }
     }
+
 
     private function sendNotificationUongozi($messageContent, $ofisiId)
     {
@@ -201,7 +220,7 @@ class DhamanaController extends Controller
             $users = $group['users'];
             $senderId = $group['users'][0]['id'];
             foreach ($users as $user) {
-                if($userId != $user->id){
+                if ($userId != $user->id) {
                     $this->sendNotification($messageContent, $user['id'], $senderId, $ofisiId);
                 }
             }
