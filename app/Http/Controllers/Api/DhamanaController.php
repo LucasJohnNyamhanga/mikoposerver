@@ -163,7 +163,15 @@ class DhamanaController extends Controller
             $query = Dhamana::query();
 
             if ($ofisiId) {
-                $query->where('ofisi_id', $ofisiId);
+                $query->where([
+                    'ofisi_id' => $ofisiId,
+                    'is_active' => true,
+                ]);
+            }else{
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ofisi yako haijapatikana'
+                ], 500);
             }
 
             // Apply filters
