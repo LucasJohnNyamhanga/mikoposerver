@@ -177,10 +177,10 @@ class DhamanaController extends Controller
             // Apply filters
             if ($filter === 'dhamana') {
                 // Mali zilizo dhamana za wateja
-                $query->whereHas('customer');
+                $query->where('is_ofisi_owned', false);
             } elseif ($filter === 'mali') {
                 // Mali za ofisi tu zisizo na wateja
-                $query->whereDoesntHave('customer');
+                $query->where('is_ofisi_owned', true);
             }
 
             // Load relations and paginate

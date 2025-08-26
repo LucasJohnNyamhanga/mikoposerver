@@ -21,7 +21,7 @@ use Carbon\Carbon;
 
 class LoanController extends Controller
 {
-    
+
     public function sajiliMkopo(LoanRequest $request)
     {
         // Validate input
@@ -148,7 +148,7 @@ class LoanController extends Controller
     }
 
     public function ombaPitishaMkopo(LoanRequest $request)
-    {   
+    {
          // Validate input
         $validator = Validator::make($request->all(), [
             'jinaKikundi' => 'nullable|string|max:255',
@@ -263,7 +263,7 @@ class LoanController extends Controller
                 }
             }
 
-            
+
 
             // Format customer names
             $customers = Customer::whereIn('id', $request->wateja)->pluck('jina');
@@ -286,7 +286,7 @@ class LoanController extends Controller
                 'description' => "Ombi la mkopo wa kiasi cha Tsh {$loan->amount} linasubili uhakiki na kupitishwa likiwa na dhamana {$dhamanaNames}, yenye jumla ya thamani ya {$totalThamani}. Afisa mwasilishi ni {$user->jina_kamili} mwenye namba {$user->mobile}. Majina ya wakopaji ni {$names}.",
             ]);
 
-            
+
 
             $this->sendNotification(
                 "Ombi la mkopo wa Tsh {$loan->amount} wa {$names} limewasilishwa  likiwa na dhamana {$dhamanaNames}, yenye jumla ya thamani ya {$totalThamani} na linasubili uhakiki na kupitishwa. Asante kwa kutumia {$appName}, kwa msaada piga simu namba {$helpNumber}.",
@@ -328,7 +328,7 @@ class LoanController extends Controller
                                 ->first();
 
             $ofisi = $userOfisi->ofisi;
-            
+
 
             $mikopoOfisi = Ofisi::with(['loans' => function ($query) {
                             $query->with(['customers','user','transactions'=> function ($query) {
@@ -342,7 +342,7 @@ class LoanController extends Controller
                             ])->whereIn('status', ['pending'])->latest();
                         }])->where('id', $ofisi->id)
                         ->first();
-            
+
             return response()->json([
             'kikundi' => $mikopoOfisi,
             ], 200);
@@ -369,7 +369,7 @@ class LoanController extends Controller
                                 ->first();
 
             $ofisi = $userOfisi->ofisi;
-            
+
 
             $mikopoOfisi = Ofisi::with(['loans' => function ($query) {
                             $query->with(['customers','user','transactions'=> function ($query) {
@@ -383,7 +383,7 @@ class LoanController extends Controller
                             ])->whereIn('status', ['waiting'])->latest();
                         }])->where('id', $ofisi->id)
                         ->first();
-            
+
             return response()->json([
             'kikundi' => $mikopoOfisi,
             ], 200);
@@ -393,7 +393,7 @@ class LoanController extends Controller
     }
 
     public function pitishaMkopo(LoanRequest $request)
-    {   
+    {
          // Validate input
         $validator = Validator::make($request->all(), [
             'loanId' => 'required|exists:loans,id',
@@ -533,7 +533,7 @@ class LoanController extends Controller
                                 ->first();
 
             $ofisi = $userOfisi->ofisi;
-            
+
 
             $mikopoOfisi = Ofisi::with(['loans' => function ($query) {
                             $query->with(['customers','user','transactions'=> function ($query) {
@@ -547,7 +547,7 @@ class LoanController extends Controller
                             ])->whereIn('status', ['error'])->latest();
                         }])->where('id', $ofisi->id)
                         ->first();
-            
+
             return response()->json([
             'kikundi' => $mikopoOfisi,
             ], 200);
@@ -557,7 +557,7 @@ class LoanController extends Controller
     }
 
     public function batilishaMkopo(LoanRequest $request)
-    {   
+    {
          // Validate input
         $validator = Validator::make($request->all(), [
             'loanId' => 'required|exists:loans,id',
@@ -899,11 +899,15 @@ class LoanController extends Controller
         $appName = env('APP_NAME');
 
         if (!$user) {
-            throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");
+            return response()->json([
+                'message' => "Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}"
+            ], 401);
         }
 
         if (!$user->activeOfisi) {
-            throw new \Exception("Kuna tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}");
+            return response()->json([
+                'message' => "Kuna tatizo. Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}"
+            ], 401);
         }
 
         $userOfisi = UserOfisi::where('user_id', $user->id)
@@ -911,7 +915,9 @@ class LoanController extends Controller
             ->first();
 
         if (!$userOfisi || !$userOfisi->ofisi) {
-            throw new \Exception("Kuna tatizo kwenye usajili wako wa ofisi. Tafadhali wasiliana na msaada.");
+            return response()->json([
+                'message' => "Kuna tatizo kwenye usajili wako wa ofisi. Tafadhali wasiliana na msaada."
+            ], 401);
         }
 
         $ofisi = $userOfisi->ofisi;
@@ -920,7 +926,9 @@ class LoanController extends Controller
 
         $positionRecord = Position::find($position);
         if (!$positionRecord) {
-            throw new \Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.");
+            return response()->json([
+                'message' => "Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo."
+            ], 401);
         }
 
         $cheo = $positionRecord->name;
@@ -928,10 +936,14 @@ class LoanController extends Controller
         $validator = Validator::make($request->all(), [
             'loanId' => 'required|exists:loans,id',
             'sababu' => 'required|string|max:255',
+            'dhamanaIds' => 'nullable|array',
+            'dhamanaIds.*' => 'integer|exists:dhamanas,id',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()->first()], 422);
+            return response()->json([
+                'message' => $validator->errors()->first()
+            ], 400);
         }
 
         DB::beginTransaction();
@@ -944,6 +956,41 @@ class LoanController extends Controller
                 'status_details' => $request->sababu,
             ]);
 
+            // Update dhamana
+            // Update dhamana
+            if ($request->has('dhamanaIds') && is_array($request->dhamanaIds)) {
+                // Zilizochaguliwa → mali ya ofisi
+                Dhamana::whereIn('id', $request->dhamanaIds)
+                    ->where('loan_id', $loan->id)
+                    ->update([
+                        'is_ofisi_owned' => true,
+                        'stored_at' => 'ofisi',
+                        'is_active' => true,
+                    ]);
+
+                // Zisizochaguliwa → zinarudishwa kwa mteja
+                Dhamana::where('loan_id', $loan->id)
+                    ->whereNotIn('id', $request->dhamanaIds)
+                    ->update([
+                        'is_active' => false,
+                        'stored_at' => 'customer',
+                        'is_ofisi_owned' => false,
+                    ]);
+            } else {
+                // Kama hakuna dhamanaIds zilizotumwa, basi zote zirudishwe kwa mteja
+                Dhamana::where('loan_id', $loan->id)
+                    ->update([
+                        'is_active' => false,
+                        'stored_at' => 'customer',
+                        'is_ofisi_owned' => false,
+                    ]);
+            }
+
+
+            // Futa miamala husika
+            Transaction::where('loan_id', $loan->id)
+                ->update(['status' => 'cancelled']);
+
             // Log mabadiliko
             Mabadiliko::create([
                 'loan_id' => $loan->id,
@@ -952,12 +999,7 @@ class LoanController extends Controller
                 'description' => "Mkopo huu umefungwa kwa sababu ya {$request->sababu} na {$cheo} {$user->jina_kamili} ({$user->mobile})",
             ]);
 
-            // Futa miamala husika
-            Transaction::where('loan_id', $loan->id)->update([
-                'status' => 'cancelled',
-            ]);
-
-            // Tayarisha majina ya wateja (kwa ajili ya notification)
+            // Majina ya wateja kwa ajili ya notification
             $customerNames = $loan->customers->pluck('jina');
             $namesString = $customerNames->count() > 1
                 ? $customerNames->slice(0, -1)->implode(', ') . ' pamoja na ' . $customerNames->last()
@@ -984,14 +1026,15 @@ class LoanController extends Controller
                 'message' => 'Mkopo umefungwa kikamilifu.',
                 'loan' => $loan,
             ], 200);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
-                'error' => 'Ombi la mkopo limeshindikana kufungwa.',
                 'message' => $e->getMessage()
             ], 500);
         }
     }
+
 
     public function getCustomerLoanDetails(LoanRequest $request)
     {
