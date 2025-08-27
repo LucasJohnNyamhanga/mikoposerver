@@ -731,6 +731,7 @@ class OfisiController extends Controller
             return $ofisi;
         }
 
+        // Hakikisha user huyu ni kiongozi
         $cheoModel = $this->auth_user->getCheoKwaOfisi($ofisi->id);
 
         if (!$cheoModel) {
@@ -751,26 +752,43 @@ class OfisiController extends Controller
             ], 400);
         }
 
-        // Find target user within the same office
-        $targetUserOfisi = UserOfisi::where('user_id', $request->userId)
-                                    ->where('ofisi_id', $ofisi->id)
-                                    ->first();
+        DB::beginTransaction();
+        try {
+            // Angalia kama user yupo kwenye ofisi hii
+            $targetUserOfisi = UserOfisi::where('user_id', $request->userId)
+                ->where('ofisi_id', $ofisi->id)
+                ->first();
 
-        if (!$targetUserOfisi) {
+            if (!$targetUserOfisi) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Mtumiaji huyu hajajiunga na ofisi yako.',
+                ], 404);
+            }
+
+            // Futa uhusiano wake na ofisi
+            $targetUserOfisi->delete();
+
+            // Ondoa kwenye actives table
+            DB::table('actives')
+                ->where('user_id', $request->userId)
+                ->where('ofisi_id', $ofisi->id)
+                ->delete();
+
+            DB::commit();
+
             return response()->json([
-                'message' => 'Mtumiaji huyu hajajiunga na ofisi yako.',
-            ], 404);
+                'message' => 'Mtumishi amefutwa kwa mafanikio kutoka ofisi yako.',
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Hitilafu imetokea: ' . $e->getMessage(),
+            ], 500);
         }
-
-        // Update pivot table status to 'denied'
-        $targetUserOfisi->position_id = null;
-        $targetUserOfisi->status = 'denied';
-        $targetUserOfisi->save();
-
-        return response()->json([
-            'message' => 'Mtumishi amefutwa kwa mafanikio kutoka ofisi yako.',
-        ]);
     }
+
 
     public function badiliCheo(OfisiRequest $request, OfisiService $ofisiService)
     {
