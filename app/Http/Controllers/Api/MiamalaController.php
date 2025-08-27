@@ -507,7 +507,9 @@ class MiamalaController extends Controller
         $cheoModel = $this->auth_user->getCheoKwaOfisi($ofisi->id);
 
         if (!$cheoModel) {
-            throw new Exception("Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.");
+            return response()->json([
+                'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.',
+            ], 400);
         }
 
         $openBalance = Transaction::where('ofisi_id', $ofisi->id)
@@ -550,7 +552,11 @@ class MiamalaController extends Controller
 
         $cheoModel = $this->auth_user->getCheoKwaOfisi($ofisi->id);
 
-        abort_unless((bool)$cheoModel, 403, 'Wewe sio kiongozi wa ofisi, huna uwezo wa kuona miamala.');
+        if (!$cheoModel) {
+            return response()->json([
+                'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.',
+            ], 400);
+        }
 
         $validator = Validator::make($request->all(), [
             'startDate' => 'required|date',

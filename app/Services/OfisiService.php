@@ -28,7 +28,7 @@ class OfisiService
         // Check if user has an activeOfisi record
         if (!$user->activeOfisi) {
             return response()->json([
-                'message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'
+                'message' => 'Huna Ofisi'
             ], 401);
         }
 

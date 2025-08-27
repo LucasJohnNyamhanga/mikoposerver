@@ -123,8 +123,10 @@ class User extends Authenticatable
             ->where('ofisi_id', $ofisiId)
             ->first();
 
-        return $userOfisi?->position->name;
+        // Safely access position->name only if available
+        return $userOfisi?->position?->name ?? null;
     }
+
 
     public function positionInOfisi(int $ofisiId): ?Position
     {

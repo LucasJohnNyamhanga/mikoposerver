@@ -25,7 +25,7 @@ class AuthController extends Controller
         $this->helpNumber = config('services.help.number');
         $this->app_url = config('services.appurl.name');
     }
-    public function registerMtumishiNewOfisi(AuthRequest $request)
+    public function registerMtumishiNewOfisi(AuthRequest $request, BeemSmsService $smsService)
     {
         // Validate the incoming request
         $validator = Validator::make($request->all(), [
@@ -43,7 +43,6 @@ class AuthController extends Controller
             'kata' => 'required|string|max:255',
         ]);
 
-        // If validation fails, return a response with error messages
         if ($validator->fails()) {
             return response()->json([
                 'status' => false,
@@ -76,14 +75,12 @@ class AuthController extends Controller
                 'password' => $request->password,
             ]);
 
-
             $ofisi = Ofisi::create([
                 'jina' => $request->jinaOfisi,
                 'mkoa' => $request->mkoa,
                 'wilaya' => $request->wilaya,
                 'kata' => $request->kata,
             ]);
-
 
             $user->maofisi()->attach($ofisi->id, [
                 'position_id' => 1,
@@ -96,38 +93,43 @@ class AuthController extends Controller
             );
 
             $cheo = $user->getCheoKwaOfisi($ofisi->id);
-
             $appName = $this->appName;
             $helpNumber = $this->helpNumber;
 
             $this->sendNotification(
-                    "Hongera, karibu kwenye mfumo wa {$appName}, umefanikiwa kufungua akaunti ya ofisi ya {$ofisi->jina} iliyopo mkoa wa {$ofisi->mkoa}, wilaya ya {$ofisi->wilaya} kwenye kata ya {$ofisi->kata}, kwa sasa wewe unawadhifa wa {$cheo} kwenye ofisi hii. mabadiliko ya uwendeshaji wa ofisi unaweza kuyafanya kwenye menu ya mfumo kupitia Usimamizi. Kwa msaada piga simu namba {$helpNumber}, Asante.",
-                    $user->id,
-                    null,
-                    $ofisi->id,
-                );
+                "Hongera, karibu kwenye mfumo wa {$appName}, umefanikiwa kufungua akaunti ya ofisi ya {$ofisi->jina} iliyopo mkoa wa {$ofisi->mkoa}, wilaya ya {$ofisi->wilaya} kwenye kata ya {$ofisi->kata}, kwa sasa wewe unawadhifa wa {$cheo} kwenye ofisi hii. Mabadiliko ya uwendeshaji wa ofisi unaweza kuyafanya kwenye menu ya mfumo kupitia Usimamizi. Kwa msaada piga simu namba {$helpNumber}, Asante.",
+                $user->id,
+                null,
+                $ofisi->id,
+            );
+
+            // ✅ Send SMS (do not return response)
+            $recipients = [$user->mobile];
+            $message = "Habari! Karibu Mikopo Center. Akaunti yako imetengenezwa. Kitengo cha Huduma kitakupigia simu kukuelekeza jinsi mfumo unavyofanya kazi. Asante!";
+            $senderId = "Datasoft";
+            $smsService->sendSms($senderId, $message, $recipients);
 
             DB::commit();
 
-            return response()->json(['message' => 'Akaunti imetengenezwa, Ingia kwenye mfumo kuendelea.'], 200);
+            return response()->json([
+                'message' => 'Akaunti imetengenezwa, Ingia kwenye mfumo kuendelea.'
+            ], 200);
+
         } catch (\Exception $e) {
             DB::rollBack();
-            $baseUrl = $this->app_url;
 
-
-
-            $imagePath = $request->picha;
-
-            $filePathImage = trim(str_replace($baseUrl, '', $imagePath));
-            $filePath = public_path($filePathImage);
+            // Delete uploaded picture if exists
+            $filePath = public_path(trim(str_replace($this->app_url, '', $request->picha)));
             if (file_exists($filePath)) {
                 unlink($filePath);
             }
+
             return response()->json([
                 'message' => 'Hitilafu : ' . $e->getMessage()
             ], 500);
         }
     }
+
 
 
 
@@ -215,7 +217,7 @@ class AuthController extends Controller
     }
 
 
-    public function registerMtumishiOldOfisi(AuthRequest $request)
+    public function registerMtumishiOldOfisi(AuthRequest $request, BeemSmsService $smsService)
     {
         // Validate the incoming request
         $validator = Validator::make($request->all(), [
@@ -284,6 +286,12 @@ class AuthController extends Controller
                     null,
                     $ofisi->id,
                 );
+
+            // ✅ Send SMS (do not return response)
+            $recipients = [$user->mobile];
+            $message = "Habari! Karibu Mikopo Center. Akaunti yako imetengenezwa. Kitengo cha Huduma kitakupigia simu kukuelekeza jinsi mfumo unavyofanya kazi. Asante!";
+            $senderId = "Datasoft";
+            $smsService->sendSms($senderId, $message, $recipients);
 
             DB::commit();
 

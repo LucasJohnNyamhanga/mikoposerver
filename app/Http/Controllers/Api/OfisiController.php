@@ -392,10 +392,9 @@ class OfisiController extends Controller
         if (!$cheoModel) {
             return response()->json([
                 'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.',
-            ], 400);
+            ], 403);
         }
 
-        // Validate input
         $validator = Validator::make($request->all(), [
             'status' => 'required|boolean',
             'userId' => 'required|integer|exists:users,id',
@@ -408,10 +407,9 @@ class OfisiController extends Controller
             ], 400);
         }
 
-        // Find target user's ofisi record
         $targetUserOfisi = UserOfisi::where('user_id', $request->userId)
-                                    ->where('ofisi_id', $ofisi->id)
-                                    ->first();
+            ->where('ofisi_id', $ofisi->id)
+            ->first();
 
         if (!$targetUserOfisi) {
             return response()->json([
@@ -422,10 +420,21 @@ class OfisiController extends Controller
         $targetUserOfisi->status = $request->status ? 'accepted' : 'denied';
         $targetUserOfisi->save();
 
+        if ($request->status) {
+            DB::table('actives')->updateOrInsert(
+                ['user_id' => $request->userId],
+                ['ofisi_id' => $ofisi->id, 'updated_at' => now(), 'created_at' => now()]
+            );
+        } else {
+            DB::table('actives')->where('user_id', $request->userId)->delete();
+        }
+
         return response()->json([
             'message' => 'Mabadiliko ya ushirika yamefanikiwa',
+            'status'  => $targetUserOfisi->status,
         ]);
     }
+
 
     public function badiliOfisi(OfisiRequest $request, OfisiService $ofisiService)
     {
@@ -468,21 +477,8 @@ class OfisiController extends Controller
 
     public function sajiliOfisiBilaUser(OfisiRequest $request, OfisiService $ofisiService)
     {
-        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof JsonResponse) {
-            return $ofisi;
-        }
 
         $user = $this->auth_user;
-
-        $cheoModel = $user->getCheoKwaOfisi($ofisi->id);
-
-        if (!$cheoModel) {
-            return response()->json([
-                'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.',
-            ], 400);
-        }
-
         $validator = Validator::make($request->all(), [
             'jinaOfisi' => 'required|string|max:255',
             'mkoa' => 'required|string|max:255',
@@ -538,17 +534,6 @@ class OfisiController extends Controller
     public function jiungeOfisiBilaUser(OfisiRequest $request, OfisiService $ofisiService)
     {
         $user = $this->auth_user;
-        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof JsonResponse) {
-            return $ofisi;
-        }
-        $cheoModel = $user->getCheoKwaOfisi($ofisi->id);
-        if (!$cheoModel) {
-            return response()->json([
-                'message' => 'Wewe sio kiongozi wa ofisi, huna uwezo wa kukamilisha hichi kitendo.',
-            ], 400);
-        }
-
 
         $validator = Validator::make($request->all(), [
             'ofisiId' => 'required|integer|exists:ofisis,id',
@@ -586,6 +571,12 @@ class OfisiController extends Controller
             }
 
             if ($status === 'accepted') {
+
+                DB::table('actives')->updateOrInsert(
+                    ['user_id' => $request->userId],
+                    ['ofisi_id' => $ofisi->id, 'updated_at' => now(), 'created_at' => now()]
+                );
+
                 return response()->json([
                     'message' => 'Umeshajiunga na ofisi hii tayari.'
                 ], 400);

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AinaController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BeemWebhookController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DhamanaController;
 use App\Http\Controllers\Api\LoanController;

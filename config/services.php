@@ -14,6 +14,11 @@ return [
     |
     */
 
+    'beem' => [
+        'api_key'    => env('BEEM_API_KEY'),
+        'secret_key' => env('BEEM_SECRET_KEY'),
+    ],
+
 
     'zenopay' => [
         'token' => env('ZENOPAY_API_KEY'),
