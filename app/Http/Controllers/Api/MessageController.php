@@ -15,6 +15,7 @@ class MessageController extends Controller
 {
     public function ondoaUnreadMeseji(MessageRequest $request)
     {
+        $helpNumber = config('services.help.number');
         $validated = $request->validate([
             'ofisiId' => 'required|integer',
         ]);
@@ -23,7 +24,7 @@ class MessageController extends Controller
 
         if (!$user) {
             return response()->json([
-                'message' => 'Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu 0784477999 kwa msaada.'
+                'message' => "Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu {$helpNumber} kwa msaada."
             ], 401);
         }
 
@@ -31,7 +32,7 @@ class MessageController extends Controller
 
         if (!$ofisi) {
             return response()->json([
-                'message' => 'Ofisi yako haijapatikana. Tafadhali piga 0784477999 kutatua hitilafu.'
+                'message' => "Ofisi yako haijapatikana. Tafadhali piga {$helpNumber} kutatua hitilafu."
             ], 404);
         }
 

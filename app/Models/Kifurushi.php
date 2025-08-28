@@ -4,7 +4,28 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * Class Kifurushi
+ *
+ * @property int $id
+ * @property string $name
+ * @property string|null $description
+ * @property string|null $muda
+ * @property int $number_of_offices
+ * @property int $duration_in_days
+ * @property float $price
+ * @property int $sms
+ * @property bool $is_active
+ * @property bool $is_popular
+ * @property string|null $offer
+ * @property bool $special
+ * @property string|null $type
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
+ */
 class Kifurushi extends Model
 {
 
@@ -32,15 +53,22 @@ class Kifurushi extends Model
     protected $fillable = [
         'name',
         'description',
+        'muda',
         'number_of_offices',
         'duration_in_days',
         'price',
+        'sms',
         'is_active',
+        'is_popular',
         'offer',
+        'special',
+        'type',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
-        'price' => 'decimal:2',
+        'is_active'   => 'boolean',
+        'is_popular'  => 'boolean',
+        'special'     => 'boolean',
+        'price'       => 'decimal:2',
     ];
 }

@@ -314,10 +314,10 @@ class LoanController extends Controller
     {
 
         $user = Auth::user();
-
+        $helpNumber = config('services.help.number');
         if (!$user) {
             // Return error if user is not found
-            return response()->json(['message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'], 401);
+            return response()->json(['message' => "Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}"], 401);
         }
 
         // Check if the user has an active Kikundi
@@ -348,17 +348,17 @@ class LoanController extends Controller
             ], 200);
         }
 
-        return response()->json(['message' => 'Huna usajili kwenye kikundi chochote. Piga simu msaada 0784477999'], 401);
+        return response()->json(['message' => "Huna usajili kwenye kikundi chochote. Piga simu msaada {$helpNumber}"], 401);
     }
 
     public function getMikopoPitisha(LoanRequest $request)
     {
 
         $user = Auth::user();
-
+        $helpNumber = config('services.help.number');
         if (!$user) {
             // Return error if user is not found
-            return response()->json(['message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'], 401);
+            return response()->json(['message' => "Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}"], 401);
         }
 
         // Check if the user has an active Kikundi
@@ -389,7 +389,7 @@ class LoanController extends Controller
             ], 200);
         }
 
-        return response()->json(['message' => 'Huna usajili kwenye kikundi chochote. Piga simu msaada 0784477999'], 401);
+        return response()->json(['message' => "Huna usajili kwenye kikundi chochote. Piga simu msaada {$helpNumber}"], 401);
     }
 
     public function pitishaMkopo(LoanRequest $request)
@@ -408,7 +408,7 @@ class LoanController extends Controller
         DB::beginTransaction();
         try {
             $user = Auth::user();
-            $helpNumber = env('APP_HELP');
+            $helpNumber = config('services.help.number');
             $appName = env('APP_NAME');
 
             if (!$user) {
@@ -519,10 +519,10 @@ class LoanController extends Controller
     {
 
         $user = Auth::user();
-
+        $helpNumber = config('services.help.number');
         if (!$user) {
             // Return error if user is not found
-            return response()->json(['message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'], 401);
+            return response()->json(['message' => "Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}"], 401);
         }
 
         // Check if the user has an active Kikundi
@@ -553,7 +553,7 @@ class LoanController extends Controller
             ], 200);
         }
 
-        return response()->json(['message' => 'Huna usajili kwenye kikundi chochote. Piga simu msaada 0784477999'], 401);
+        return response()->json(['message' => "Huna usajili kwenye kikundi chochote. Piga simu msaada  {$helpNumber}"], 401);
     }
 
     public function batilishaMkopo(LoanRequest $request)
@@ -571,7 +571,7 @@ class LoanController extends Controller
         DB::beginTransaction();
         try {
             $user = Auth::user();
-            $helpNumber = env('APP_HELP');
+            $helpNumber = config('services.help.number');
             $appName = env('APP_NAME');
 
             if (!$user) {
@@ -666,7 +666,7 @@ class LoanController extends Controller
         DB::beginTransaction();
         try {
             $user       = Auth::user();
-            $helpNumber = env('APP_HELP');
+            $helpNumber = config('services.help.number');
             $appName    = env('APP_NAME');
 
             if (!$user) {
@@ -895,7 +895,7 @@ class LoanController extends Controller
     public function fungaMkopo(LoanRequest $request)
     {
         $user = Auth::user();
-        $helpNumber = env('APP_HELP');
+        $helpNumber = config('services.help.number');
         $appName = env('APP_NAME');
 
         if (!$user) {
@@ -1040,7 +1040,7 @@ class LoanController extends Controller
     {
         try {
             $user = Auth::user();
-            $helpNumber = env('APP_HELP');
+            $helpNumber = config('services.help.number');
 
             if (!$user) {
                 throw new \Exception("Kuna tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}");

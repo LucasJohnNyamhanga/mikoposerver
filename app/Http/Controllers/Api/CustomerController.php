@@ -23,10 +23,10 @@ class CustomerController extends Controller
                 'jina' => 'required|string|max:255',
                 'jinaMaarufu' => 'required|string|max:15',
                 'jinsia' => 'required|string|max:255',
-                'anapoishi' => 'required|string', 
+                'anapoishi' => 'required|string',
                 'simu' => 'required|string|max:255|unique:customers,simu',
                 'kazi' => 'required|string|max:255',
-                'picha' => 'required|string|max:255', 
+                'picha' => 'required|string|max:255',
                 'ofisiId' => 'required|integer',
             ], [
                 'simu.unique' => 'Namba ya simu imeshatumika kwa mteja mwingine', // Custom message for username uniqueness
@@ -53,7 +53,7 @@ class CustomerController extends Controller
             if (!$ofisi) {
                 throw new \Exception("Ofisi uliyoichagua haipo au imefutwa");
             }
-        
+
             $mteja = Customer::create([
                 'jina' => $request->jina,
                 'jinaMaarufu' => $request->jinaMaarufu,
@@ -83,7 +83,7 @@ class CustomerController extends Controller
             DB::rollBack();
             $baseUrl = env('APP_URL');
             $imagePath = $request->picha;
-            
+
             $filePathImage = trim(str_replace($baseUrl, '', $imagePath));
             $filePath = public_path($filePathImage);
             if (file_exists($filePath)) {
@@ -105,16 +105,16 @@ class CustomerController extends Controller
                 'jina' => 'required|string|max:255',
                 'jinaMaarufu' => 'required|string|max:15',
                 'jinsia' => 'required|string|max:255',
-                'anapoishi' => 'required|string', 
+                'anapoishi' => 'required|string',
                 'simu' => 'required|string|max:255|unique:customers,simu,' . $request->mtejaId, // exclude current mteja from unique check
                 'kazi' => 'required|string|max:255',
-                'picha' => 'required|string|max:255', 
+                'picha' => 'required|string|max:255',
             ], [
                 'simu.unique' => 'Namba ya simu imeshatumika kwa mteja mwingine',
             ]);
 
             $appName = env('APP_NAME');
-            $helpNumber = env('APP_HELP');
+            $helpNumber = config('services.help.number');
 
             if ($validator->fails()) {
                 return response()->json([
@@ -128,13 +128,13 @@ class CustomerController extends Controller
             }
 
             if (!$user->activeOfisi) {
-                return response()->json(['message' => 'Huna usajili kwenye ofisi yeyote. Piga simu msaada 0784477999'], 401);
+                return response()->json(['message' => "Huna usajili kwenye ofisi yeyote. Piga simu msaada {$helpNumber}"], 401);
             }
             // Retrieve the KikundiUser record to get the position and the Kikundi details
             $userOfisi = UserOfisi::where('user_id', $user->id)
                                 ->where('ofisi_id', $user->activeOfisi->ofisi_id)
                                 ->first();
-    
+
             $ofisi = $userOfisi->ofisi;
 
             $mteja = Customer::find($request->mtejaId);

@@ -348,6 +348,7 @@ class OfisiController extends Controller
 
     public function getMwamala(OfisiRequest $request, OfisiService $ofisiService)
     {
+        $helpNumber = config('app.help.number');
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
         if ($ofisi instanceof JsonResponse) {
             return $ofisi;
@@ -369,7 +370,7 @@ class OfisiController extends Controller
         // Check if transaction belongs to user's active ofisi
         if ($transaction->ofisi_id !== $ofisi->id) {
             return response()->json([
-                'message' => 'Huna ruhusa ya kuona taarifa za mwamala huu. Piga simu msaada 0784477999'
+                'message' => 'Huna ruhusa ya kuona taarifa za mwamala huu. Piga simu msaada '.$helpNumber
             ], 403);
         }
 

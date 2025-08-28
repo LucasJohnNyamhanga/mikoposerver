@@ -16,10 +16,11 @@ class OfisiService
      */
     public function getAuthenticatedOfisiUser(): Ofisi|JsonResponse
     {
+        $helpNumber = config('services.help.number');
         // Check if user is authenticated
         if (!auth()->check()) {
             return response()->json([
-                'message' => 'Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada 0784477999'
+                'message' => "Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}"
             ], 401);
         }
 
@@ -40,7 +41,7 @@ class OfisiService
         // Validate that userOfisi and its related ofisi exist
         if (!$userOfisi || !$userOfisi->ofisi) {
             return response()->json([
-                'message' => 'Ofisi haijapatikana. Piga simu msaada 0784477999'
+                'message' => "Ofisi haijapatikana. Piga simu msaada {$helpNumber}"
             ], 404);
         }
 

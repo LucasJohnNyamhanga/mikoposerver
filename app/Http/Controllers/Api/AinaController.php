@@ -80,7 +80,7 @@ class AinaController extends Controller
     public function futaKato(AinaRequest $request)
     {
         $user = Auth::user();
-        $helpNumber = env('APP_HELP', '0784477999'); // fallback just in case
+        $helpNumber = env('APP_HELP', '0767 887 999'); // fallback just in case
 
         if (!$user) {
             throw new HttpResponseException(response()->json([

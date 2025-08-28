@@ -4,11 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AuthRequest;
+use App\Models\Kifurushi;
+use App\Models\KifurushiPurchase;
 use App\Models\Message;
 use App\Models\Ofisi;
+use App\Models\Payment;
 use App\Models\Position;
+use App\Models\SmsBalance;
 use App\Models\User;
 use App\Models\UserOfisi;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +32,7 @@ class AuthController extends Controller
     }
     public function registerMtumishiNewOfisi(AuthRequest $request, BeemSmsService $smsService)
     {
+
         // Validate the incoming request
         $validator = Validator::make($request->all(), [
             'jinaKamili' => 'required|string|max:255',
@@ -64,6 +70,7 @@ class AuthController extends Controller
 
         DB::beginTransaction();
         try {
+            // Create user (password not hashed)
             $user = User::create([
                 'jina_kamili' => $request->jinaKamili,
                 'mobile' => $request->simu,
@@ -75,6 +82,7 @@ class AuthController extends Controller
                 'password' => $request->password,
             ]);
 
+            // Create office
             $ofisi = Ofisi::create([
                 'jina' => $request->jinaOfisi,
                 'mkoa' => $request->mkoa,
@@ -82,20 +90,22 @@ class AuthController extends Controller
                 'kata' => $request->kata,
             ]);
 
+            // Attach user to office
             $user->maofisi()->attach($ofisi->id, [
                 'position_id' => 1,
                 'status' => 'accepted',
             ]);
 
+            // Update actives table
             DB::table('actives')->updateOrInsert(
                 ['user_id' => $user->id],
                 ['ofisi_id' => $ofisi->id, 'updated_at' => now(), 'created_at' => now()]
             );
 
+            // Send notification
             $cheo = $user->getCheoKwaOfisi($ofisi->id);
             $appName = $this->appName;
             $helpNumber = $this->helpNumber;
-
             $this->sendNotification(
                 "Hongera, karibu kwenye mfumo wa {$appName}, umefanikiwa kufungua akaunti ya ofisi ya {$ofisi->jina} iliyopo mkoa wa {$ofisi->mkoa}, wilaya ya {$ofisi->wilaya} kwenye kata ya {$ofisi->kata}, kwa sasa wewe unawadhifa wa {$cheo} kwenye ofisi hii. Mabadiliko ya uwendeshaji wa ofisi unaweza kuyafanya kwenye menu ya mfumo kupitia Usimamizi. Kwa msaada piga simu namba {$helpNumber}, Asante.",
                 $user->id,
@@ -103,11 +113,25 @@ class AuthController extends Controller
                 $ofisi->id,
             );
 
-            // ✅ Send SMS (do not return response)
+            // ✅ Send SMS
             $recipients = [$user->mobile];
-            $message = "Habari! Karibu Mikopo Center. Akaunti yako imetengenezwa. Kitengo cha Huduma kitakupigia simu kukuelekeza jinsi mfumo unavyofanya kazi. Asante!";
+            $message = "Habari! Karibu Mikopo Center. Akaunti yako imefunguliwa na umezawadiwa kifurushi cha bure cha siku 30 pamoja na SMS 20. Timu yetu itakupigia kukuelekeza jinsi mfumo utakavyorahisisha usimamizi wa mikopo na kukuza biashara yako. Kwa msaada piga {$helpNumber}. Huduma bora kukuwezesha kufanikisha ndoto zako!";
             $senderId = "Datasoft";
             $smsService->sendSms($senderId, $message, $recipients);
+
+            // ✅ Get default package
+            $kifurushi = Kifurushi::find(1);
+
+            if ($kifurushi) {
+                // ✅ Update SMS balance if it's SMS package
+                if ($kifurushi->type === 'sms' && $kifurushi->sms > 0) {
+                    $this->updateSmsBalance($user, $kifurushi);
+                }
+
+                // ✅ Create purchase record
+                $this->createKifurushiPurchaseIfNotExists($user, $kifurushi);
+            }
+            // If $kifurushi not found, skip SMS & purchase update
 
             DB::commit();
 
@@ -129,6 +153,7 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
 
 
 
@@ -287,12 +312,6 @@ class AuthController extends Controller
                     $ofisi->id,
                 );
 
-            // ✅ Send SMS (do not return response)
-            $recipients = [$user->mobile];
-            $message = "Habari! Karibu Mikopo Center. Akaunti yako imetengenezwa. Kitengo cha Huduma kitakupigia simu kukuelekeza jinsi mfumo unavyofanya kazi. Asante!";
-            $senderId = "Datasoft";
-            $smsService->sendSms($senderId, $message, $recipients);
-
             DB::commit();
 
             return response()->json(['message' => 'Akaunti imetengenezwa, Ingia kwenye mfumo kuendelea.'], 200);
@@ -383,7 +402,7 @@ class AuthController extends Controller
 
             if (!$ofisi) {
                 return response()->json([
-                    'message' => 'Ofisi yako ina changamoto kupatikana. Kwa msaada piga simu namba {$helpNumber}'
+                    'message' => "Ofisi yako ina changamoto kupatikana. Kwa msaada piga simu namba {$helpNumber}"
                 ], 400);
             }
 
@@ -628,12 +647,13 @@ class AuthController extends Controller
     public function logWithAccessToken(AuthRequest $request)
     {
         try {
+            $helpNumber = config('services.help.number');
             // Retrieve the user with their active Kikundi details
             $user = User::where('id', Auth::id())->first();
 
             if (!$user) {
                 return response()->json([
-                    'message' => 'Uhakiki wa utumishi wako umeshindikana, wasiliana na 0784477999.'
+                    'message' => "Uhakiki wa utumishi wako umeshindikana, wasiliana na {$helpNumber}."
                 ], 404);
             }
 
@@ -666,5 +686,54 @@ class AuthController extends Controller
             'sender_id' => $senderId,
             'ofisi_id' => $ofisiId,
         ]);
+    }
+
+    protected function createKifurushiPurchaseIfNotExists(User $user, Kifurushi $kifurushi): void
+    {
+
+            KifurushiPurchase::create([
+                'user_id'       => $user->id,
+                'kifurushi_id'  => $kifurushi->id,
+                'status'        => 'approved',
+                'start_date'    => now(),
+                'end_date'      => now()->addDays($kifurushi->duration_in_days),
+                'is_active'     => true,
+                'approved_at'   => now(),
+                'reference'     => 'Majaribio',
+                'ofisi_id'      => $user->ofisi_id,
+            ]);
+
+    }
+
+    /**
+     * Update SMS balance when a user purchases SMS bundles.
+     */
+    protected function updateSmsBalance(User $user, Kifurushi $kifurushi): void
+    {
+
+                $balance = SmsBalance::where('user_id', $user->id)
+                    ->where('ofisi_id', $user->ofisi_id)
+                    ->where('status', 'active')
+                    ->first();
+
+                if ($balance) {
+                    // Add purchased SMS to existing balance
+                    $balance->increment('allowed_sms', $kifurushi->sms);
+                } else {
+                    // Create a new SMS balance record
+                    SmsBalance::create([
+                        'user_id' => $user->id,
+                        'ofisi_id' => $user->ofisi_id,
+                        'allowed_sms' => $kifurushi->sms,
+                        'used_sms' => 0,
+                        'start_date' => now()->toDateString(),
+                        'expires_at' => now()->addMonth()->toDateString(),
+                        'status' => 'active',
+                        'sender_id' => $payment->sender_id ?? null,
+                        'phone' => $user->mobile,
+                    ]);
+                }
+
+
     }
 }
