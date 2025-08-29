@@ -27,7 +27,7 @@ class Ofisi extends Model
                     ->wherePivot('status', 'accepted');
     }
 
-    public function userOfisis(): Ofisi|HasMany
+    public function userOfisis(): HasMany
     {
         return $this->hasMany(UserOfisi::class);
     }
@@ -54,12 +54,12 @@ class Ofisi extends Model
         return $this->hasMany(Customer::class);
     }
 
-    public function loans(): Ofisi|HasMany
+    public function loans(): HasMany
     {
         return $this->hasMany(Loan::class);
     }
 
-    public function transactions(): Ofisi|HasMany
+    public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
     }
@@ -82,27 +82,27 @@ class Ofisi extends Model
         return $this->hasMany(Aina::class);
     }
 
-    public function dhamana(): Ofisi|HasMany
+    public function dhamana(): HasMany
     {
         return $this->hasMany(Dhamana::class);
     }
 
-    public function verifiedAccounts(): Ofisi|HasMany
+    public function verifiedAccounts(): HasMany
     {
         return $this->hasMany(VerifiedAccount::class);
     }
 
-    public function smsBalances(): Ofisi|HasMany
+    public function smsBalances(): HasMany
     {
         return $this->hasMany(SmsBalance::class);
     }
 
-    public function kifurushiPurchases(): Ofisi|HasMany
+    public function kifurushiPurchases(): HasMany
     {
         return $this->hasMany(KifurushiPurchase::class);
     }
 
-    public function verifiedAccount(): Ofisi|HasOne
+    public function verifiedAccount(): HasOne
     {
         return $this->hasOne(VerifiedAccount::class);
     }

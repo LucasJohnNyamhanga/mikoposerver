@@ -13,6 +13,7 @@ use App\Models\Position;
 use App\Models\SmsBalance;
 use App\Models\User;
 use App\Models\UserOfisi;
+use App\Services\BeemSmsService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -68,8 +69,8 @@ class AuthController extends Controller
             ], 409);
         }
 
-        DB::beginTransaction();
         try {
+            DB::beginTransaction();
             // Create user (password not hashed)
             $user = User::create([
                 'jina_kamili' => $request->jinaKamili,
@@ -113,27 +114,27 @@ class AuthController extends Controller
                 $ofisi->id,
             );
 
-            // ✅ Send SMS
-            $recipients = [$user->mobile];
-            $message = "Habari! Karibu Mikopo Center. Akaunti yako imefunguliwa na umezawadiwa kifurushi cha bure cha siku 30 pamoja na SMS 20. Timu yetu itakupigia kukuelekeza jinsi mfumo utakavyorahisisha usimamizi wa mikopo na kukuza biashara yako. Kwa msaada piga {$helpNumber}. Huduma bora kukuwezesha kufanikisha ndoto zako!";
-            $senderId = "Datasoft";
-            $smsService->sendSms($senderId, $message, $recipients);
+            // ✅ Get default package by name
+            $kifurushi = Kifurushi::where('name', 'ILIKE', 'majaribio')->first();
 
-            // ✅ Get default package
-            $kifurushi = Kifurushi::find(1);
 
             if ($kifurushi) {
                 // ✅ Update SMS balance if it's SMS package
-                if ($kifurushi->type === 'sms' && $kifurushi->sms > 0) {
-                    $this->updateSmsBalance($user, $kifurushi);
-                }
+                    $this->updateSmsBalance($user, $kifurushi, $ofisi->id);
 
                 // ✅ Create purchase record
-                $this->createKifurushiPurchaseIfNotExists($user, $kifurushi);
+                $this->createKifurushiPurchaseIfNotExists($user, $kifurushi, $ofisi->id);
             }
             // If $kifurushi not found, skip SMS & purchase update
 
             DB::commit();
+            if ($kifurushi) {
+                // ✅ Send SMS
+                $recipients = [$user->mobile];
+                $message = "Habari {$this->jina($user->jina_kamili)}! Karibu Mikopo Center. Akaunti yako imefunguliwa na umezawadiwa kifurushi cha bure cha siku {$kifurushi->duration_in_days} pamoja na SMS {$kifurushi->sms}. Timu yetu itakupigia kukuelekeza jinsi mfumo utakavyorahisisha usimamizi wa mikopo na kukuza biashara yako. Kwa msaada piga {$helpNumber}. Maisha ni rahisi kupitia mfumo wa kidigitali!";
+                $senderId = "Datasoft";
+                $smsService->sendSms($senderId, $message, $recipients, $user);
+            }
 
             return response()->json([
                 'message' => 'Akaunti imetengenezwa, Ingia kwenye mfumo kuendelea.'
@@ -560,6 +561,7 @@ class AuthController extends Controller
 
             $oldImage = $request->get('old_image'); // e.g. https://yourdomain/uploads/... or full S3 URL
             $disk = config('filesystems.default');
+            $aws_url = config('filesystems.disks.s3.url'); //show me how to update env('AWS_URL') and env('AWS_BUCKET') and env('AWS_DEFAULT_REGION')
 
             if ($oldImage && $oldImage !== $request->picha) {
                 if ($disk === 's3') {
@@ -688,52 +690,66 @@ class AuthController extends Controller
         ]);
     }
 
-    protected function createKifurushiPurchaseIfNotExists(User $user, Kifurushi $kifurushi): void
+    protected function createKifurushiPurchaseIfNotExists(User $user, Kifurushi $kifurushi, int $ofisi_id): void
     {
+        $now = now()->setTimezone('Africa/Nairobi');
 
-            KifurushiPurchase::create([
-                'user_id'       => $user->id,
-                'kifurushi_id'  => $kifurushi->id,
-                'status'        => 'approved',
-                'start_date'    => now(),
-                'end_date'      => now()->addDays($kifurushi->duration_in_days),
-                'is_active'     => true,
-                'approved_at'   => now(),
-                'reference'     => 'Majaribio',
-                'ofisi_id'      => $user->ofisi_id,
-            ]);
-
+        KifurushiPurchase::create([
+            'user_id'       => $user->id,
+            'kifurushi_id'  => $kifurushi->id,
+            'status'        => 'approved',
+            'start_date'    => $now->copy()->toDateTimeString(),
+            'end_date'      => $now->copy()->addDays($kifurushi->duration_in_days)->toDateTimeString(),
+            'is_active'     => true,
+            'approved_at'   => $now->toDateTimeString(),
+            'reference'     => 'Majaribio',
+            'ofisi_id'      => $ofisi_id,
+        ]);
     }
 
     /**
      * Update SMS balance when a user purchases SMS bundles.
      */
-    protected function updateSmsBalance(User $user, Kifurushi $kifurushi): void
+    protected function updateSmsBalance(User $user, Kifurushi $kifurushi, int $ofisi_id): void
     {
+        $now = now()->setTimezone('Africa/Nairobi');
+        $balance = SmsBalance::where('user_id', $user->id)
+            ->where('ofisi_id', $ofisi_id)
+            ->where('status', 'active')
+            ->first();
 
-                $balance = SmsBalance::where('user_id', $user->id)
-                    ->where('ofisi_id', $user->ofisi_id)
-                    ->where('status', 'active')
-                    ->first();
+        if ($balance) {
+            // Add purchased SMS to existing balance
+            $balance->increment('allowed_sms', $kifurushi->sms);
 
-                if ($balance) {
-                    // Add purchased SMS to existing balance
-                    $balance->increment('allowed_sms', $kifurushi->sms);
-                } else {
-                    // Create a new SMS balance record
-                    SmsBalance::create([
-                        'user_id' => $user->id,
-                        'ofisi_id' => $user->ofisi_id,
-                        'allowed_sms' => $kifurushi->sms,
-                        'used_sms' => 0,
-                        'start_date' => now()->toDateString(),
-                        'expires_at' => now()->addMonth()->toDateString(),
-                        'status' => 'active',
-                        'sender_id' => $payment->sender_id ?? null,
-                        'phone' => $user->mobile,
-                    ]);
-                }
-
-
+            // Update expiry using addDays from package duration
+            $balance->expires_at = $now->copy()->addDays($kifurushi->duration_in_days)->toDateString();
+            $balance->save();
+        } else {
+            // Create a new SMS balance record
+            SmsBalance::create([
+                'user_id' => $user->id,
+                'ofisi_id' => $ofisi_id,
+                'allowed_sms' => $kifurushi->sms,
+                'used_sms' => 0,
+                'start_date' => $now->copy()->toDateString(),
+                'expires_at' => $now->copy()->addDays($kifurushi->duration_in_days)->toDateString(),
+                'status' => 'active',
+                'sender_id' => null, // free SMS, no sender
+                'phone' => $user->mobile,
+            ]);
+        }
     }
+
+    protected function jina(string $jina): string
+    {
+        if (!$jina) {
+            return '';
+        }
+
+        // Split by space and return the first part
+        $parts = explode(' ', trim($jina));
+        return $parts[0] ?? '';
+    }
+
 }

@@ -35,11 +35,11 @@ return new class extends Migration
             $table->index(['user_id', 'status']);
         });
 
-        // ✅ PostgreSQL partial index for pending + active purchases
+        // ✅ PostgreSQL partial index for approved + active purchases
         DB::statement("
             CREATE INDEX kifurushi_active_pending_idx
             ON kifurushi_purchases (user_id)
-            WHERE status = 'pending' AND is_active = true
+            WHERE status = 'approved' AND is_active = true
         ");
     }
 

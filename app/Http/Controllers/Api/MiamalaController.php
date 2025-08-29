@@ -11,6 +11,7 @@ use App\Models\Ofisi;
 use App\Models\Position;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\BeemSmsService;
 use App\Services\OfisiService;
 use Carbon\Carbon;
 use Exception;
@@ -35,7 +36,7 @@ class MiamalaController extends Controller
         $this->auth_user = Auth::user();
     }
 
-    public function lipiaRejesho(MiamalaRequest $request, OfisiService $ofisiService)
+    public function lipiaRejesho(MiamalaRequest $request, OfisiService $ofisiService, BeemSmsService $smsService)
     {
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
         if ($ofisi instanceof JsonResponse) return $ofisi;
@@ -95,18 +96,24 @@ class MiamalaController extends Controller
             ]);
 
             $newTotal = $totalRejesho + $data['amount'];
-
             if ($newTotal >= $loan->total_due) {
                 $loan->update(['status' => 'repaid']);
             }
 
-            $customerNames = Customer::whereIn(
-                'id',
-                DB::table('loan_customers')->where('loan_id', $data['loanId'])->pluck('customer_id')
-            )->pluck('jina');
+            // Fetch all customers linked to this loan in one query
+            $customerIds = DB::table('loan_customers')
+                ->where('loan_id', $data['loanId'])
+                ->pluck('customer_id');
 
-            $names = $this->formatCustomerNames($customerNames);
+            $customers = Customer::whereIn('id', $customerIds)->get(['jina', 'simu']);
+            $customersPhones = $customers->pluck('simu');
 
+            // Format first names for SMS using "pamoja na" logic
+            $firstNames = $customers->pluck('jina')->map(fn($fullName) => $this->jina($fullName));
+            $customerNamesSms = $this->formatCustomerNames($firstNames);
+
+            // Notifications
+            $names = $this->formatCustomerNames($customers->pluck('jina'));
             $this->sendNotification(
                 "Hongera, rejesho la Tsh {$data['amount']} la mkopo wa $names limepokelewa. Asante kwa kutumia $appName, kwa msaada piga simu namba $helpNumber.",
                 $user->id,
@@ -122,22 +129,27 @@ class MiamalaController extends Controller
 
             DB::commit();
 
+            // ✅ Send SMS
+            $phoneNumber = User::whereHas('positions', function ($q) {
+                $q->where('positions.id', 1);
+            })->value('mobile');
+
+            // Fallback if no user with position 1
+            $phoneNumber = $phoneNumber ?? '0767 887 999';
+
+            $deniBaki = $remaining - $data['amount'];
+            $message = "Habari!, Imethibitishwa {$data['amount']}Tsh imepokelewa na {$user->jina_kamili} wa {$ofisi->jina} kwa malipo ya rejesho la mkopo wa $customerNamesSms. Deni lililobakia ni Tsh {$deniBaki}, kwa maelezo zaidi piga {$phoneNumber}.";
+
+            $senderId = "DatasoftPay";
+            $smsService->sendSms($senderId, $message, $customersPhones->toArray(), $user);
+
             return response()->json([
                 'message' => 'Rejesho limepokelewa kikamilifu.',
                 'transaction' => $transaction
             ]);
 
-        } catch (Throwable  $e) {
-            try{
-                DB::rollBack();
-            }
-            catch (Throwable $e){
-                return response()->json([
-                    'error' => 'Rejesho limeshindikana kupokelewa.',
-                    'message' => $e->getMessage()
-                ], 500);
-            }
-
+        } catch (Throwable $e) {
+            DB::rollBack();
             return response()->json([
                 'error' => 'Rejesho limeshindikana kupokelewa.',
                 'message' => $e->getMessage()
@@ -147,13 +159,10 @@ class MiamalaController extends Controller
 
 
 
-    public function lipiaFaini(MiamalaRequest $request, OfisiService $ofisiService)
+    public function lipiaFaini(MiamalaRequest $request, OfisiService $ofisiService, BeemSmsService $smsService)
     {
 
-        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof JsonResponse) {
-            return $ofisi;
-        }
+
 
         // Validate input
         $validator = Validator::make($request->all(), [
@@ -175,20 +184,19 @@ class MiamalaController extends Controller
 
         try {
 
-            $ofisi = Ofisi::findOrFail($request->ofisiId); // Ensure the office exists
+            $ofisi = $ofisiService->getAuthenticatedOfisiUser();
+            if ($ofisi instanceof JsonResponse) {
+                return $ofisi;
+            }
+
             $user = $this->auth_user;
 
             $appName = $this->appName;
             $helpNumber = $this->helpNumber;
 
-            try {
-                DB::beginTransaction();
-            } catch (Throwable $e) {
-                return response()->json([
-                    'error' => 'Faini imeshindikana kupokelewa.',
-                    'message' => $e->getMessage()
-                ], 500);
-            }
+
+            DB::beginTransaction();
+
             // Create the transaction record
             Transaction::create([
                 'type' => $request->type,
@@ -234,14 +242,22 @@ class MiamalaController extends Controller
                 $user->id
             );
 
-            try {
-                DB::commit();
-            } catch (Throwable $e) {
-                return response()->json([
-                    'error' => 'Faini imeshindikana kupokelewa.',
-                    'message' => $e->getMessage()
-                ], 500);
-            }
+
+            DB::commit();
+
+            // ✅ Send SMS
+            $phoneNumber = User::whereHas('positions', function($q) {
+                $q->where('positions.id', 1);
+            })->value('mobile');
+
+            // Provide a fallback if no user is found
+            $phoneNumber = $phoneNumber ?? '0767 887 999';
+            $recipients = [$mteja->simu];
+            $message = "Habari {$this->jina($mteja->jina)}!, Imethibitishwa {$request->amount}Tsh imepokelewa na {$ofisi->jina} kwa malipo ya faini. Pata mikopo nafuu na huduma bora, kwa maelezo zaidi piga {$phoneNumber}!";
+            $senderId = "DatasoftPay";
+            $smsService->sendSms($senderId, $message, $recipients, $user);
+
+
 
             return response()->json([
                 'message' => 'Faini imepokelewa kikamilifu.',
@@ -625,6 +641,16 @@ class MiamalaController extends Controller
         return $customers->implode(', ') . ' pamoja na ' . $lastCustomer;
     }
 
+    protected function jina(string $jina): string
+    {
+        if (!$jina) {
+            return '';
+        }
+
+        // Split by space and return the first part
+        $parts = explode(' ', trim($jina));
+        return $parts[0] ?? '';
+    }
 
     private function sendNotificationUongozi($messageContent, $ofisiId)
     {
