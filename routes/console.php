@@ -7,5 +7,6 @@ Artisan::command('schedule:custom', function () {
 })->purpose('Run custom schedule');
 
 return function (Schedule $schedule) {
-    $schedule->command('kifurushi:deactivate-expired')->dailyAt('00:00');
+    $schedule->command('kifurushi:expire')->dailyAt('03:00')
+        ->timezone('Africa/Nairobi');
 };

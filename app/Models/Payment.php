@@ -2,67 +2,50 @@
 
 namespace App\Models;
 
+use App\Jobs\CheckPaymentStatus;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
-
-/**
- * @property int $id
- * @property int $user_id
- * @property int $kifurushi_id
- * @property int $ofisi_id
- * @property string $reference
- * @property string $status
- * @property string|null $transaction_id
- * @property string|null $channel
- * @property string|null $phone
- * @property float $amount
- * @property int $retries_count
- * @property Carbon|null $next_check_at
- * @property Carbon|null $paid_at
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
- * @property mixed $sms_amount
- */
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Payment extends Model
 {
-    use HasFactory;
-
+    /**
+     * Mass assignable attributes.
+     */
     protected $fillable = [
         'user_id',
-        'ofisi_id',
         'kifurushi_id',
-        'amount',
-        'status',
+        'ofisi_id',
         'reference',
+        'status',
         'transaction_id',
         'channel',
         'phone',
+        'amount',
+        'sms_amount',
         'retries_count',
         'next_check_at',
         'paid_at',
     ];
 
+    /**
+     * Attribute casting.
+     */
     protected $casts = [
-        'amount' => 'float',
         'next_check_at' => 'datetime',
-        'paid_at' => 'datetime',
+        'paid_at'       => 'datetime',
+        'amount'        => 'decimal:2',
     ];
 
-    /** --------------------
-     *  Relationships
-     *  -------------------- */
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function ofisi(): BelongsTo
-    {
-        return $this->belongsTo(Ofisi::class);
     }
 
     public function kifurushi(): BelongsTo
@@ -70,17 +53,53 @@ class Payment extends Model
         return $this->belongsTo(Kifurushi::class);
     }
 
-    /** --------------------
-     *  Scopes
-     *  -------------------- */
-
-    public function scopeCompleted($query)
+    public function kifurushiPurchase(): HasOne
     {
-        return $query->where('status', 'completed');
+        return $this->hasOne(KifurushiPurchase::class, 'reference', 'reference');
     }
 
+    public function ofisi(): BelongsTo
+    {
+        return $this->belongsTo(Ofisi::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Model Events
+    |--------------------------------------------------------------------------
+    */
+
+    protected static function booted(): void
+    {
+        // Automatically dispatch job for pending payments
+        static::created(function (Payment $payment) {
+            if ($payment->status === 'pending') {
+                CheckPaymentStatus::dispatch($payment);
+            }
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Query Scopes
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Scope a query to only include pending payments.
+     */
     public function scopePending($query)
     {
         return $query->where('status', 'pending');
+    }
+
+    /**
+     * Scope a query to only include payments ready for retry.
+     */
+    public function scopeReadyForCheck($query)
+    {
+        return $query->where('status', 'pending')
+            ->whereNotNull('next_check_at')
+            ->where('next_check_at', '<=', now());
     }
 }

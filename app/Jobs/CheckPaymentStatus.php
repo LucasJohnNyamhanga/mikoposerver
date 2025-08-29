@@ -22,7 +22,7 @@ class CheckPaymentStatus implements ShouldQueue
         $this->payment = $payment;
     }
 
-    public function handle(ZenoPayService $zenoPay)
+    public function handle(ZenoPayService $zenoPay): void
     {
         // Skip if payment already processed
         if ($this->payment->status !== 'pending') {
