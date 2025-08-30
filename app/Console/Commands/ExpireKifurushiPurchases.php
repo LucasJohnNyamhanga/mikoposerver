@@ -24,6 +24,6 @@ class ExpireKifurushiPurchases extends Command
                 'updated_at' => now(),
             ]);
 
-        $this->info("Expired $expiredCount kifurushi purchases.");
+        $this->info("Vifurushi $expiredCount vimebadilishwa baada ya kuexpire.");
     }
 }
