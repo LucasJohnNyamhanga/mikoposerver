@@ -27,6 +27,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(false);
 
             $table->string('password');
+            $table->string('fcm_token')->nullable();
             $table->rememberToken();
             $table->timestamps();
 

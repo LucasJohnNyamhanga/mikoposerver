@@ -612,39 +612,53 @@ class AuthController extends Controller
     {
         // Validate input fields
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string',
-            'password' => 'required|string',
+            'username'  => 'required|string',
+            'password'  => 'required|string',
+            'fcm_token' => 'nullable|string', // accept FCM token
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['message' => 'Jaza nafasi zote zilizo wazi.', 'errors' => $validator->errors()], 400);
+            return response()->json([
+                'message' => 'Jaza nafasi zote zilizo wazi.',
+                'errors'  => $validator->errors()
+            ], 400);
         }
 
         $username = $request->input('username');
         $password = $request->input('password');
+        $fcmToken = $request->input('fcm_token');
 
         // Find the user by username
         $user = User::where("username", $username)->first();
 
         if (!$user) {
-            // Return error if user is not found
-            return response()->json(['message' => 'Jina au neno la siri uliotumia, siyo sahihi.'], 401);
+            return response()->json([
+                'message' => 'Jina au neno la siri uliotumia, siyo sahihi.'
+            ], 401);
         }
 
-        $passwordDatabase = $user->password;
-        if ($password == $passwordDatabase) {
+        // Simple password check (replace with Hash::check if using hashed passwords)
+        if ($password == $user->password) {
+
+            // Update FCM token if provided
+            if (!empty($fcmToken)) {
+                $user->update(['fcm_token' => $fcmToken]);
+            }
+
             $token = $user->createToken('auth_token')->plainTextToken;
 
-            // Return user and token if successful
             return response()->json([
-                'user' => $user,
+                'user'  => $user,
                 'token' => $token,
             ], 200);
 
         } else {
-            return response()->json(['message' => 'Jina au neno la siri uliotumia, siyo sahihi.'], 401);
+            return response()->json([
+                'message' => 'Jina au neno la siri uliotumia, siyo sahihi.'
+            ], 401);
         }
     }
+
 
     public function logWithAccessToken(AuthRequest $request)
     {

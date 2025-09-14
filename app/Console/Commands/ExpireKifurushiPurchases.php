@@ -4,12 +4,22 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\KifurushiPurchase;
+use App\Models\SmsBalance;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 
 class ExpireKifurushiPurchases extends Command
 {
     protected $signature = 'kifurushi:expire';
     protected $description = 'Mark kifurushi purchases as expired if end_date is reached or passed';
+
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        parent::__construct();
+        $this->notificationService = $notificationService;
+    }
 
     public function handle()
     {
@@ -36,24 +46,30 @@ class ExpireKifurushiPurchases extends Command
                 ->first();
 
             if ($smsBalance) {
-                // Ikiwa used_sms > offered_sms, punguza difference kwenye bought_sms
                 if ($smsBalance->used_sms > $smsBalance->offered_sms) {
                     $excess = $smsBalance->used_sms - $smsBalance->offered_sms;
                     $smsBalance->bought_sms = max(0, $smsBalance->bought_sms - $excess);
                 }
 
-                // Reset offered_sms na used_sms
                 $smsBalance->offered_sms = 0;
                 $smsBalance->used_sms    = 0;
-
-                // Optional: deactivate balance
-                //$smsBalance->status = 'expired';
-
                 $smsBalance->save();
+            }
+
+            // 3️⃣ Send notification to the user
+            if (!empty($purchase->user->fcm_token)) {
+                $title = "Kifurushi chako kimekwisha";
+                $body  = "Kifurushi chako cha SMS kimekwisha leo. Tafadhali nunua kifurushi kipya ili kuendelea kutumia huduma.";
+
+                $this->notificationService->sendFcmNotification(
+                    $purchase->user->fcm_token,
+                    $title,
+                    $body,
+                    ['purchase_id' => $purchase->id]
+                );
             }
         }
 
-        $this->info("Vifurushi {$expiredPurchases->count()} vimebadilishwa baada ya kuexpire.");
+        $this->info("Vifurushi {$expiredPurchases->count()} vimebadilishwa baada ya kuexpire na notifications zimetumwa.");
     }
-
 }

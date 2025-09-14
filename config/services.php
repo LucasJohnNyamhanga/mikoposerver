@@ -24,6 +24,10 @@ return [
         'token' => env('ZENOPAY_API_KEY'),
     ],
 
+    'fcm' => [
+        'server_key' => env('FCM_SERVER_KEY'),
+    ],
+
     'appurl' => [
         'name' => env('APP_URL'),
     ],
