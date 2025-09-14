@@ -26,64 +26,70 @@ class BeemSmsService
     public function sendSms(string $senderId, string $message, array $recipients, User $user, string $scheduleTime = ""): array
     {
         try {
-            // Get active SMS balance for the user and office
             $balance = SmsBalance::where('user_id', $user->id)
                 ->where('ofisi_id', $user->ofisi_id)
                 ->where('status', 'active')
                 ->first();
 
-            $senderIdName = $balance->sender_id ?? $senderId;
-
-            // Calculate SMS segments per message (1 SMS = 160 characters)
-            $segmentsPerMessage = (int) ceil(strlen($message) / 160);
-
-            // Total SMS to deduct = segments × number of recipients
-            $totalSmsToDeduct = $segmentsPerMessage * count($recipients);
-
-            // Check if balance exists and is sufficient
-            if ($balance && ($balance->allowed_sms > $balance->used_sms)) {
-
-                // Optional: still send even if totalSmsToDeduct exceeds remaining balance
-                // fallback behavior can be handled if needed
-
-                $response = Http::withHeaders([
-                    'Authorization' => 'Basic ' . base64_encode("{$this->apiKey}:{$this->secretKey}"),
-                    'Content-Type' => 'application/json',
-                ])->post("{$this->baseUrl}/v1/send", [
-                    'source_addr'   => $senderIdName,
-                    'schedule_time' => $scheduleTime,
-                    'encoding'      => 0,
-                    'message'       => $message,
-                    'recipients'    => $this->formatRecipients($recipients),
-                ]);
-
-                $responseData = $response->json();
-
-                if ($response->successful() && (!isset($responseData['code']) || $responseData['code'] == 100)) {
-                    // Deduct total SMS segments from balance
-                    $balance->used_sms += $totalSmsToDeduct;
-                    $balance->save();
-
-                    return [
-                        'successful' => true,
-                        'data' => $responseData,
-                        'used_sms' => $balance->used_sms,
-                        'allowed_sms' => $balance->allowed_sms,
-                        'segments_per_message' => $segmentsPerMessage,
-                        'recipients_count' => count($recipients),
-                        'total_sms_deducted' => $totalSmsToDeduct
-                    ];
-                }
+            if (!$balance) {
+                return ['successful' => false, 'message' => 'No active SMS balance found.'];
             }
 
-            // Original fallback message
-            return ['successful' => false, 'message' => 'SMS failed to send or insufficient balance.'];
+            $senderIdName = $balance->sender_id ?? $senderId;
+
+            // Detect Unicode messages
+            $isUnicode = strlen($message) !== mb_strlen($message, 'UTF-8');
+            $segmentSize = $isUnicode ? 70 : 160;
+            $segmentsPerMessage = (int) ceil(mb_strlen($message, 'UTF-8') / $segmentSize);
+
+            $totalSmsToDeduct = $segmentsPerMessage * count($recipients);
+
+            $remaining = ($balance->bought_sms + $balance->offered_sms) - $balance->used_sms;
+
+            if ($remaining < $totalSmsToDeduct) {
+                return [
+                    'successful' => false,
+                    'message'    => "Insufficient balance. Required: {$totalSmsToDeduct}, Remaining: {$remaining}."
+                ];
+            }
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Basic ' . base64_encode("{$this->apiKey}:{$this->secretKey}"),
+                'Content-Type'  => 'application/json',
+            ])->post("{$this->baseUrl}/v1/send", [
+                'source_addr'   => $senderIdName,
+                'schedule_time' => $scheduleTime,
+                'encoding'      => $isUnicode ? 2 : 0,
+                'message'       => $message,
+                'recipients'    => $this->formatRecipients($recipients),
+            ]);
+
+            $responseData = $response->json();
+
+            if ($response->successful() && (!isset($responseData['code']) || $responseData['code'] == 100)) {
+                $balance->increment('used_sms', $totalSmsToDeduct);
+
+                return [
+                    'successful'           => true,
+                    'data'                 => $responseData,
+                    'used_sms'             => $balance->used_sms,
+                    'offered_sms'          => $balance->offered_sms,
+                    'bought_sms'           => $balance->bought_sms,
+                    'segments_per_message' => $segmentsPerMessage,
+                    'recipients_count'     => count($recipients),
+                    'total_sms_deducted'   => $totalSmsToDeduct,
+                    'remaining_balance'    => ($balance->bought_sms + $balance->offered_sms) - $balance->used_sms,
+                ];
+            }
+
+            return ['successful' => false, 'message' => 'SMS API request failed.', 'response' => $responseData];
 
         } catch (\Exception $e) {
             Log::error("Beem Send SMS Error: " . $e->getMessage());
             return ['successful' => false, 'message' => $e->getMessage()];
         }
     }
+
 
 
     /**

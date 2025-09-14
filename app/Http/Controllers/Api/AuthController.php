@@ -719,8 +719,8 @@ class AuthController extends Controller
             ->first();
 
         if ($balance) {
-            // Add purchased SMS to existing balance
-            $balance->increment('allowed_sms', $kifurushi->sms);
+            // Add offered SMS to existing balance
+            $balance->offered_sms = $kifurushi->sms;
 
             // Update expiry using addDays from package duration
             $balance->expires_at = $now->copy()->addDays($kifurushi->duration_in_days)->toDateString();
@@ -730,8 +730,9 @@ class AuthController extends Controller
             SmsBalance::create([
                 'user_id' => $user->id,
                 'ofisi_id' => $ofisi_id,
-                'allowed_sms' => $kifurushi->sms,
                 'used_sms' => 0,
+                'offered_sms' => $kifurushi->sms,
+                'bought_sms' => 0,
                 'start_date' => $now->copy()->toDateString(),
                 'expires_at' => $now->copy()->addDays($kifurushi->duration_in_days)->toDateString(),
                 'status' => 'active',

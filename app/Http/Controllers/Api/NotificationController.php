@@ -47,7 +47,7 @@ class NotificationController extends Controller
                 ->whereIn('user_id', $userIdsInOfisi)
                 ->where('status', 'active')
                 ->whereDate('expires_at', '>=', now())
-                ->selectRaw('SUM(allowed_sms - used_sms) as balance')
+                ->selectRaw('SUM((bought_sms+offered_sms) - used_sms) as balance')//update: it's not allowed_sms, it should be (bought_sms+offered_sms)
                 ->value('balance');
 
             $totalSmsBalance = (int) $totalSmsBalance;

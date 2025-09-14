@@ -135,7 +135,7 @@ class ZenoPayService
                 }
 
                 // ✅ Kifurushi purchase, create purchase record
-                    $this->createKifurushiPurchaseIfNotExists($payment);
+                $this->createKifurushiPurchaseIfNotExists($payment);
 
             });
         } catch (Throwable $e) {
@@ -154,19 +154,55 @@ class ZenoPayService
     protected function createKifurushiPurchaseIfNotExists(Payment $payment): void
     {
         if (!KifurushiPurchase::where('reference', $payment->reference)->exists()) {
+            // Create new kifurushi purchase record
             KifurushiPurchase::create([
-                'user_id'       => $payment->user_id,
-                'kifurushi_id'  => $payment->kifurushi_id,
-                'status'        => 'approved',
-                'start_date'    => now(),
-                'end_date'      => now()->addDays($payment->kifurushi->duration_in_days),
-                'is_active'     => true,
-                'approved_at'   => now(),
-                'reference'     => $payment->reference,
-                'ofisi_id'      => $payment->ofisi_id,
+                'user_id'      => $payment->user_id,
+                'kifurushi_id' => $payment->kifurushi_id,
+                'status'       => 'approved',
+                'start_date'   => now(),
+                'end_date'     => now()->addDays($payment->kifurushi->duration_in_days),
+                'is_active'    => true,
+                'approved_at'  => now(),
+                'reference'    => $payment->reference,
+                'ofisi_id'     => $payment->ofisi_id,
             ]);
+
+            $balance = SmsBalance::where('user_id', $payment->user_id)
+                ->where('ofisi_id', $payment->ofisi_id)
+                ->where('status', 'active')
+                ->first();
+
+            if ($balance) {
+                // Reset balance completely
+                $balance->offered_sms = $payment->sms_amount;
+                $balance->bought_sms  = 0;
+                $balance->used_sms    = 0;
+                $balance->start_date  = now()->toDateString();
+                $balance->expires_at  = now()->addMonth()->toDateString();
+
+                if (!empty($payment->sender_id)) {
+                    $balance->sender_id = $payment->sender_id;
+                }
+
+                $balance->save();
+            } else {
+                // Create a fresh balance record
+                SmsBalance::create([
+                    'user_id'     => $payment->user_id,
+                    'ofisi_id'    => $payment->ofisi_id,
+                    'offered_sms' => $payment->sms_amount,
+                    'bought_sms'  => 0,
+                    'used_sms'    => 0,
+                    'start_date'  => now()->toDateString(),
+                    'expires_at'  => now()->addMonth()->toDateString(),
+                    'status'      => 'active',
+                    'sender_id'   => $payment->sender_id ?? null,
+                    'phone'       => $payment->phone,
+                ]);
+            }
         }
     }
+
 
     /**
      * Update SMS balance when a user purchases SMS bundles.
@@ -182,13 +218,14 @@ class ZenoPayService
 
                 if ($balance) {
                     // Add purchased SMS to existing balance
-                    $balance->increment('allowed_sms', $payment->sms_amount);
+                    $balance->increment('bought_sms', $payment->sms_amount);
                 } else {
                     // Create a new SMS balance record
                     SmsBalance::create([
                         'user_id' => $payment->user_id,
                         'ofisi_id' => $payment->ofisi_id,
-                        'allowed_sms' => $payment->sms_amount,
+                        'offered_sms' => 0,
+                        'bought_sms' => $payment->sms_amount,
                         'used_sms' => 0,
                         'start_date' => now()->toDateString(),
                         'expires_at' => now()->addMonth()->toDateString(),

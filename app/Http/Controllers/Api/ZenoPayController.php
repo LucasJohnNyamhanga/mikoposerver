@@ -136,7 +136,7 @@ class ZenoPayController extends Controller
         return match ($prefix) {
             '075', '076', '074'         => 'Mpesa',       // Vodacom
             '078', '068', '069', '079'  => 'AirtelMoney', // Airtel
-            '071', '077', '065'         => 'TigoPesa',    // Tigo
+            '071', '077', '065'         => 'Mix By Yas',    // Mix By Yas
             '062', '061'                => 'HaloPesa',    // Halotel
             '073'                       => 'TTCLPesa',    // TTCL
             default                     => 'Mtandao',     // Unknown/Other

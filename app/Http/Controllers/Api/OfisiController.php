@@ -12,6 +12,7 @@ use App\Models\Message;
 use App\Models\Notification;
 use App\Models\Ofisi;
 use App\Models\Position;
+use App\Models\SmsBalance;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\OfisiService;
@@ -104,16 +105,58 @@ class OfisiController extends Controller
             ->pluck('user_id');
 
         $totalSmsBalance = 0;
+        $totalBoughtSms = 0;
+        $totalOfferedSms = 0;
         $activePurchase = null;
 
         if ($userIdsInOfisi->isNotEmpty()) {
             // Calculate total SMS balance
-            $totalSmsBalance = (int) DB::table('sms_balances')
+//            $totalSmsBalance = (int) DB::table('sms_balances')
+//                ->whereIn('user_id', $userIdsInOfisi)
+//                ->where('status', 'active')
+//                ->whereDate('expires_at', '>=', now())
+//                ->selectRaw('SUM((bought_sms+offered_sms) - used_sms) as balance')
+//                ->value('balance');
+//
+//            $totalBoughtSms = (int) DB::table('sms_balances')
+//                ->whereIn('user_id', $userIdsInOfisi)
+//                ->where('status', 'active')
+//                ->whereDate('expires_at', '>=', now())
+//                ->selectRaw('SUM(bought_sms - used_sms) as balance')
+//                ->value('balance');
+//
+//
+//            $totalOfferedSms = (int)DB::table('sms_balances')
+//                ->whereIn('user_id', $userIdsInOfisi)
+//                ->where('status', 'active')
+//                ->whereDate('expires_at', '>=', now())
+//                ->selectRaw('offered_sms as balance')
+//                ->value('balance');
+//
+//            if($totalBoughtSms < 1) {
+//                $totalOfferedSms = (int)DB::table('sms_balances')
+//                    ->whereIn('user_id', $userIdsInOfisi)
+//                    ->where('status', 'active')
+//                    ->whereDate('expires_at', '>=', now())
+//                    ->selectRaw('SUM(offered_sms - (used_sms - bought_sms)) as balance')
+//                    ->value('balance');
+//            }
+
+            $smsStats = DB::table('sms_balances')
                 ->whereIn('user_id', $userIdsInOfisi)
                 ->where('status', 'active')
                 ->whereDate('expires_at', '>=', now())
-                ->selectRaw('SUM(allowed_sms - used_sms) as balance')
-                ->value('balance');
+                ->selectRaw('
+                    SUM((bought_sms + offered_sms) - used_sms) as total_balance,
+                    SUM(bought_sms - used_sms) as total_bought_balance,
+                    SUM(GREATEST(offered_sms - (used_sms - bought_sms), 0)) as total_offered_balance
+                ')
+                ->first();
+
+            $totalSmsBalance = (int) $smsStats->total_balance;
+            $totalBoughtSms = (int) $smsStats->total_bought_balance;
+            $totalOfferedSms = (int) $smsStats->total_offered_balance;
+
 
             // --- Step 1: Kifurushi notification first ---
             $activePurchase = KifurushiPurchase::with('kifurushi')
@@ -156,7 +199,11 @@ class OfisiController extends Controller
             // --- Step 2: SMS notification second ---
             if ($totalSmsBalance <= 0) {
                 $smsNotification = Notification::getPrioritized(1, 3, 'sms_balance')->first();
-            } elseif ($totalSmsBalance <= 20) {
+            } elseif ($totalSmsBalance <= 25
+
+
+
+            ) {
                 $smsNotification = Notification::getPrioritized(1, 2, 'sms_balance')->first();
             } elseif ($totalSmsBalance <= 50) {
                 $smsNotification = Notification::getPrioritized(1, 1, 'sms_balance')->first();
@@ -201,6 +248,8 @@ class OfisiController extends Controller
             'user_id' => $user->id,
             'ofisi' => $ofisiYangu,
             'total_sms_balance' => $totalSmsBalance,
+            'totalBoughtSms' => $totalBoughtSms,
+            'totalOfferedSms' => $totalOfferedSms,
             'latest_active_kifurushi' => $activePurchase,
             'notifications' => $notifications,
         ]);

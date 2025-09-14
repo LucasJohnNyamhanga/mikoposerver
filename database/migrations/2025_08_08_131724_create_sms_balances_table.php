@@ -15,7 +15,8 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('ofisi_id')->constrained()->onDelete('cascade');
 
-            $table->unsignedInteger('allowed_sms')->default(0);
+            $table->unsignedInteger('bought_sms')->default(0);
+            $table->unsignedInteger('offered_sms')->default(0);
             $table->unsignedInteger('used_sms')->default(0);
 
             $table->date('start_date');

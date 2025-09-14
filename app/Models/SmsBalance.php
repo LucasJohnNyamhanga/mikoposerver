@@ -12,7 +12,8 @@ class SmsBalance extends Model
     protected $fillable = [
         'user_id',
         'ofisi_id',
-        'allowed_sms',
+        'bought_sms',
+        'offered_sms',
         'used_sms',
         'start_date',
         'expires_at',
@@ -77,7 +78,7 @@ class SmsBalance extends Model
 
     public function remainingSms(): int
     {
-        return max(0, $this->allowed_sms - $this->used_sms);
+        return max(0, ($this->bought_sms + $this->offered_sms) - $this->used_sms);
     }
 
     public function isValid(): bool
