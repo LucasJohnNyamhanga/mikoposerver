@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\BeemSmsService;
 use Illuminate\Console\Command;
 use App\Models\KifurushiPurchase;
 use App\Models\SmsBalance;
@@ -21,12 +22,13 @@ class ExpireKifurushiPurchases extends Command
         $this->notificationService = $notificationService;
     }
 
-    public function handle()
+    public function handle(BeemSmsService $smsService)
     {
         $today = Carbon::now('Africa/Nairobi')->setTime(3, 0, 0);
 
-        // Pata vifurushi vyote vilivyo hai lakini vimekoma
-        $expiredPurchases = KifurushiPurchase::where('is_active', true)
+        // Get all active but expired purchases, eager-load user
+        $expiredPurchases = KifurushiPurchase::with('user')
+            ->where('is_active', true)
             ->where('status', 'approved')
             ->whereDate('end_date', '<=', $today)
             ->get();
@@ -39,7 +41,7 @@ class ExpireKifurushiPurchases extends Command
                 'updated_at' => now(),
             ]);
 
-            // 2️⃣ Adjust SMS balance kwa user + ofisi
+            // 2️⃣ Adjust SMS balance
             $smsBalance = SmsBalance::where('user_id', $purchase->user_id)
                 ->where('ofisi_id', $purchase->ofisi_id)
                 ->where('status', 'active')
@@ -56,10 +58,10 @@ class ExpireKifurushiPurchases extends Command
                 $smsBalance->save();
             }
 
-            // 3️⃣ Send notification to the user
+            // 3️⃣ Send FCM notification
             if (!empty($purchase->user->fcm_token)) {
                 $title = "Kifurushi chako kimekwisha";
-                $body  = "Kifurushi chako cha SMS kimekwisha leo. Tafadhali nunua kifurushi kipya ili kuendelea kutumia huduma.";
+                $body  = "Kifurushi chako cha Mfumo kimekwisha leo. Tafadhali nunua kifurushi kipya ili kuendelea kutumia huduma.";
 
                 $this->notificationService->sendFcmNotification(
                     $purchase->user->fcm_token,
@@ -68,8 +70,25 @@ class ExpireKifurushiPurchases extends Command
                     ['purchase_id' => $purchase->id]
                 );
             }
+
+            // 4️⃣ Send free SMS
+            if (!empty($purchase->user->mobile)) {
+                $recipients = [$purchase->user->mobile];
+                $message = "Habari {$this->jina($purchase->user->jina_kamili)}! Kifurushi chako cha mfumo wa Mikopo Center kimekwisha. Nunua upya ili uendelelee kutatua changamoto kiurahisi kupitia mfumo wa kidigitali!";
+                $senderId = "Datasoft";
+
+                $smsService->sendFreeSms($senderId, $message, $recipients);
+            }
         }
 
         $this->info("Vifurushi {$expiredPurchases->count()} vimebadilishwa baada ya kuexpire na notifications zimetumwa.");
     }
+
+    protected function jina(string $jina): string
+    {
+        if (!$jina) return '';
+        $parts = explode(' ', trim($jina));
+        return $parts[0] ?? '';
+    }
+
 }

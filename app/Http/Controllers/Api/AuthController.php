@@ -133,7 +133,7 @@ class AuthController extends Controller
                 $recipients = [$user->mobile];
                 $message = "Habari {$this->jina($user->jina_kamili)}! Karibu Mikopo Center. Akaunti yako imefunguliwa na umezawadiwa kifurushi cha bure cha siku {$kifurushi->duration_in_days} pamoja na SMS {$kifurushi->sms}. Timu yetu itakupigia kukuelekeza jinsi mfumo utakavyorahisisha usimamizi wa mikopo na kukuza biashara yako. Kwa msaada piga {$helpNumber}. Maisha ni rahisi kupitia mfumo wa kidigitali!";
                 $senderId = "Datasoft";
-                $smsService->sendSms($senderId, $message, $recipients, $user);
+                $smsService->sendFreeSms($senderId, $message, $recipients);
             }
 
             return response()->json([
@@ -642,7 +642,7 @@ class AuthController extends Controller
 
             // Update FCM token if provided
             if (!empty($fcmToken)) {
-                $user->update(['fcm_token' => $fcmToken]);
+                $user->update(['fcm_token' => $fcmToken]);//why is it not updating?
             }
 
             $token = $user->createToken('auth_token')->plainTextToken;

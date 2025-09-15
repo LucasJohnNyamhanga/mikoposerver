@@ -90,7 +90,42 @@ class BeemSmsService
         }
     }
 
+    public function sendFreeSms(string $senderId, string $message, array $recipients, string $scheduleTime = ""): array
+    {
+        try {
+            // Detect Unicode messages
+            $isUnicode = strlen($message) !== mb_strlen($message, 'UTF-8');
+            $segmentSize = $isUnicode ? 70 : 160;
+            $segmentsPerMessage = (int) ceil(mb_strlen($message, 'UTF-8') / $segmentSize);
 
+            $response = Http::withHeaders([
+                'Authorization' => 'Basic ' . base64_encode("{$this->apiKey}:{$this->secretKey}"),
+                'Content-Type'  => 'application/json',
+            ])->post("{$this->baseUrl}/v1/send", [
+                'source_addr'   => $senderId,
+                'schedule_time' => $scheduleTime,
+                'encoding'      => $isUnicode ? 2 : 0,
+                'message'       => $message,
+                'recipients'    => $this->formatRecipients($recipients),
+            ]);
+
+            $responseData = $response->json();
+
+            if ($response->successful() && (!isset($responseData['code']) || $responseData['code'] == 100)) {
+                return [
+                    'successful'           => true,
+                    'data'                 => $responseData,
+                    'segments_per_message' => $segmentsPerMessage,
+                    'recipients_count'     => count($recipients),
+                ];
+            }
+            return ['successful' => false, 'message' => 'SMS API request failed.', 'response' => $responseData];
+
+        } catch (\Exception $e) {
+            Log::error("Beem Send Free SMS Error: " . $e->getMessage());
+            return ['successful' => false, 'message' => $e->getMessage()];
+        }
+    }
 
     /**
      * Check Balance
