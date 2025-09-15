@@ -110,37 +110,6 @@ class OfisiController extends Controller
         $activePurchase = null;
 
         if ($userIdsInOfisi->isNotEmpty()) {
-            // Calculate total SMS balance
-//            $totalSmsBalance = (int) DB::table('sms_balances')
-//                ->whereIn('user_id', $userIdsInOfisi)
-//                ->where('status', 'active')
-//                ->whereDate('expires_at', '>=', now())
-//                ->selectRaw('SUM((bought_sms+offered_sms) - used_sms) as balance')
-//                ->value('balance');
-//
-//            $totalBoughtSms = (int) DB::table('sms_balances')
-//                ->whereIn('user_id', $userIdsInOfisi)
-//                ->where('status', 'active')
-//                ->whereDate('expires_at', '>=', now())
-//                ->selectRaw('SUM(bought_sms - used_sms) as balance')
-//                ->value('balance');
-//
-//
-//            $totalOfferedSms = (int)DB::table('sms_balances')
-//                ->whereIn('user_id', $userIdsInOfisi)
-//                ->where('status', 'active')
-//                ->whereDate('expires_at', '>=', now())
-//                ->selectRaw('offered_sms as balance')
-//                ->value('balance');
-//
-//            if($totalBoughtSms < 1) {
-//                $totalOfferedSms = (int)DB::table('sms_balances')
-//                    ->whereIn('user_id', $userIdsInOfisi)
-//                    ->where('status', 'active')
-//                    ->whereDate('expires_at', '>=', now())
-//                    ->selectRaw('SUM(offered_sms - (used_sms - bought_sms)) as balance')
-//                    ->value('balance');
-//            }
 
             $smsStats = DB::table('sms_balances')
                 ->whereIn('user_id', $userIdsInOfisi)

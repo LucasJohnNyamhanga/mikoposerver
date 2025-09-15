@@ -28,6 +28,7 @@ return new class extends Migration
 
             $table->string('password');
             $table->string('fcm_token')->nullable();
+            $table->timestamp('last_login_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
 

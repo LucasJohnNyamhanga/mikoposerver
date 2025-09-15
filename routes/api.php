@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AinaController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BeemWebhookController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DhamanaController;
 use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\MessageController;
@@ -79,6 +80,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('removeVerifiedOfisi', [VerifiedAccountController::class, 'removeVerifiedOfisi']);
     Route::get('getNotifications', [NotificationController::class, 'getNotifications']);
     Route::get('getDhamana', [DhamanaController::class, 'getAllDhamana']);
+    // routes/api.php
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+
 });
 
 Route::post('/upload', [UploadController::class, 'uploadImage']);
