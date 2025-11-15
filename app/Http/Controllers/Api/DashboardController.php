@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\BeemSmsService;
 use App\Services\OfisiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -12,64 +13,78 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    public function index(OfisiService $ofisiService)
+    public function index(OfisiService $ofisiService, BeemSmsService $smsService)
     {
+        // 1️⃣ Validate authenticated office
         $ofisi = $ofisiService->getAuthenticatedOfisiUser();
         if ($ofisi instanceof JsonResponse) {
             return $ofisi;
         }
 
-        // Current authenticated user with activeOfisi and ofisi details
-        $user = User::with(['activeOfisi' => function ($query) {
-            $query->with('ofisi'); // get ofisi details for activeOfisi
-        }])->find(Auth::id());
+        // 2️⃣ Get authenticated user with active office
+        $user = User::with(['activeOfisi.ofisi'])->find(Auth::id());
 
-        // Stats za ofisi na vifurushi
+        // 3️⃣ Aggregate office stats in one query
         $stats = DB::table('ofisis')
-            ->leftJoin('kifurushi_purchases', 'ofisis.id', '=', 'kifurushi_purchases.ofisi_id')
-            ->selectRaw('COUNT(DISTINCT ofisis.id) as total_ofisi')
-            ->selectRaw("COUNT(DISTINCT CASE WHEN ofisis.status = 'active' THEN ofisis.id END) as active_ofisi")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN ofisis.status = 'inactive' THEN ofisis.id END) as inactive_ofisi")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN kifurushi_purchases.end_date BETWEEN NOW() AND (NOW() + INTERVAL '7 days') THEN ofisis.id END) as expiring_in_7days")
-            ->first();
+        ->leftJoin('kifurushi_purchases', 'ofisis.id', '=', 'kifurushi_purchases.ofisi_id')
+        ->leftJoin('kifurushis', 'kifurushi_purchases.kifurushi_id', '=', 'kifurushis.id')
+        ->leftJoin('payments', function ($join) {
+            $join->on('ofisis.id', '=', 'payments.ofisi_id')
+                    ->where('payments.status', 'completed')
+                    ->where('payments.paid_at', '>=', now()->subDays(7));
+        })
+        ->selectRaw("
+            COUNT(DISTINCT ofisis.id) AS total_ofisi,
+            COUNT(DISTINCT CASE WHEN ofisis.status = 'active' THEN ofisis.id END) AS active_ofisi,
+            COUNT(DISTINCT CASE WHEN ofisis.status = 'inactive' THEN ofisis.id END) AS inactive_ofisi,
+            COUNT(DISTINCT CASE WHEN kifurushi_purchases.end_date BETWEEN NOW() AND (NOW() + INTERVAL '7 days') THEN ofisis.id END) AS expiring_in_7days,
+            COUNT(DISTINCT CASE WHEN payments.id IS NOT NULL THEN ofisis.id END) AS ofisi_paid_last_7days,
+            COUNT(DISTINCT CASE WHEN kifurushi_purchases.created_at >= NOW() - INTERVAL '7 days' THEN ofisis.id END) AS ofisi_bought_new_kifurushi_last_7days,
+            COUNT(DISTINCT CASE WHEN kifurushis.name = 'majaribio' AND ofisis.status = 'active' THEN ofisis.id END) AS active_majaribio_ofisi,
+            COUNT(DISTINCT CASE WHEN DATE(ofisis.last_seen) = CURRENT_DATE THEN ofisis.id END) AS active_today_ofisi,
+            (SELECT COUNT(*) FROM users WHERE DATE(last_login_at) = CURRENT_DATE) AS active_today_users
+        ")
+        ->first();
 
-        // Payment totals
-        $today = Carbon::today();
-        $weekStart = Carbon::now()->startOfWeek();
-        $weekEnd   = Carbon::now()->endOfWeek();
-        $monthStart = Carbon::now()->startOfMonth();
-        $monthEnd   = Carbon::now()->endOfMonth();
 
-        $payments = [
-            'today' => DB::table('payments')
-                ->whereBetween('created_at', [$today, $today->copy()->endOfDay()])
-                ->sum('amount'),
+        // 4️⃣ Payments this month (optimized single query)
+        $today = now()->day;
+        $rawPayments = DB::table('payments')
+            ->selectRaw('EXTRACT(DAY FROM paid_at)::int AS day, SUM(amount)::float AS total')
+            ->where('status', 'completed')
+            ->whereMonth('paid_at', now()->month)
+            ->whereYear('paid_at', now()->year)
+            ->whereDay('paid_at', '<=', $today)
+            ->groupBy('day')
+            ->pluck('total', 'day');
 
-            'this_week' => DB::table('payments')
-                ->whereBetween('created_at', [$weekStart, $weekEnd])
-                ->sum('amount'),
+        // Build array with zeros for missing days
+        $payments = [];
+        for ($i = 1; $i <= $today; $i++) {
+            $payments[] = [
+                'day' => $i,
+                'total' => $rawPayments[$i] ?? 0,
+            ];
+        }
 
-            'this_month' => DB::table('payments')
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->sum('amount'),
-        ];
+        // 5️⃣ SMS Balance
+        $smsBalance = $smsService->checkBalance();
 
-        // Monthly loan disbursement (chart)
+        // 6️⃣ Monthly loan disbursement (optimized)
         $monthlyLoanDisbursement = DB::table('loans')
-            ->selectRaw("DATE_TRUNC('month', created_at) as month, COUNT(id) as total_loans")
+            ->selectRaw("DATE_TRUNC('month', created_at) AS month, COUNT(id) AS total_loans")
             ->groupBy('month')
-            ->orderBy('month', 'asc')
+            ->orderBy('month')
             ->get();
 
+        // 7️⃣ Return JSON response
         return response()->json([
             'user' => $user,
             'stats' => $stats,
             'payments' => $payments,
             'monthlyLoanDisbursement' => $monthlyLoanDisbursement,
+            'sms' => $smsBalance,
         ]);
     }
-
-
-
 
 }

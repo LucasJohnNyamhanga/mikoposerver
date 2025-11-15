@@ -135,7 +135,7 @@ class OfisiController extends Controller
                 ->first();
 
             if (!$activePurchase) {
-                $kifurushiNotification = Notification::getPrioritized(1, 3, 'kifurushi_expired')->first();
+                $kifurushiNotification = Notification::getPrioritized(1, 3, conditionKey: 'kifurushi_expired')->first();
             } else {
                 $daysLeft = now()->diffInDays($activePurchase->end_date, false);
                 $stage = null;
@@ -194,7 +194,7 @@ class OfisiController extends Controller
         }
 
         // --- Step 3: Other info notifications ---
-        $excludedKeys = ['sms_balance', 'kifurushi_expiry', 'kifurushi_expired'];
+        $excludedKeys = ['sms_balance', 'kifurushi_expiry', 'kifurushi_expired'];//condition keys
         $infoNotifications = Notification::whereNotIn('condition_key', $excludedKeys)
             ->where('is_active', true)
             ->inRandomOrder()
@@ -307,7 +307,7 @@ class OfisiController extends Controller
         }
 
         // Get all user IDs in the authenticated user's current office
-        $userIdsInOfisi = \DB::table('user_ofisis')
+        $userIdsInOfisi = DB::table('user_ofisis')
             ->where('ofisi_id', $ofisi->id)
             ->pluck('user_id');
 
