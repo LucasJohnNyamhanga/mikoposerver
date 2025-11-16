@@ -136,15 +136,40 @@ class BeemSmsService
             $response = Http::withHeaders([
                 'Authorization' => 'Basic ' . base64_encode("{$this->apiKey}:{$this->secretKey}"),
                 'Content-Type'  => 'application/json',
-            ])->get("{$this->baseUrl}/public/v1/vendors/balance");
+            ])
+            ->timeout(8)            // avoid hanging forever
+            ->retry(2, 500)         // retry in case of small network issues
+            ->get("{$this->baseUrl}/public/v1/vendors/balance");
 
-            return $response->json();
+            // If HTTP response failed (like DNS, timeout, SSL)
+            if ($response->failed()) {
+                Log::error("Beem Check Balance FAILED: " . $response->body());
 
-        } catch (\Exception $e) {
-            Log::error("Beem Check Balance Error: " . $e->getMessage());
-            return ['error' => $e->getMessage()];
+                return [
+                    'balance' => 0,
+                    'error'   => true,
+                    'message' => 'Could not fetch SMS balance (service error)'
+                ];
+            }
+
+            // Success
+            return [
+                'balance' => $response->json()['data']['credit_balance'] ?? 0,
+                'error'   => false
+            ];
+
+        } catch (\Throwable $e) {
+            // Catch DNS, timeout, connection, SSL, etc.
+            Log::error("Beem Check Balance Exception: " . $e->getMessage());
+
+            return [
+                'balance' => 0,
+                'error'   => true,
+                'message' => 'Could not fetch SMS balance (network error)'
+            ];
         }
     }
+
 
 
     /**
