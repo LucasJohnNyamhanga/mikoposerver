@@ -165,6 +165,7 @@ class User extends Authenticatable
         'password',
         'anakoishi',
         'fcm_token',
+        'last_login_at',
     ];
 
     protected $hidden = [

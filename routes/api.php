@@ -82,6 +82,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('getDhamana', [DhamanaController::class, 'getAllDhamana']);
     // routes/api.php
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/getOfisiZilizolipaLeo', [OfisiController::class, 'getOfisiZilizolipaLeo']);
 
 });
 

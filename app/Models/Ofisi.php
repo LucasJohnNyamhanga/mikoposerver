@@ -102,11 +102,23 @@ class Ofisi extends Model
         return $this->hasMany(KifurushiPurchase::class);
     }
 
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
     public function verifiedAccount(): HasOne
     {
         return $this->hasOne(VerifiedAccount::class);
     }
 
+    public function scopeWithTodayCompletedPayments($query)
+    {
+        return $query->whereHas('payments', function ($q) {
+            $q->whereDate('created_at', today())
+            ->where('status', 'completed');
+        });
+    }
 
 
     protected $fillable = [

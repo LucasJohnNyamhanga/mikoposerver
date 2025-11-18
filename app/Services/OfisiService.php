@@ -2,10 +2,9 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
-use App\Models\UserOfisi;
 use App\Models\Ofisi;
+use Illuminate\Support\Facades\Auth;
 
 class OfisiService
 {
@@ -17,36 +16,35 @@ class OfisiService
     public function getAuthenticatedOfisiUser(): Ofisi|JsonResponse
     {
         $helpNumber = config('services.help.number');
-        // Check if user is authenticated
+
+        // 1️⃣ Check authentication
         if (!auth()->check()) {
             return response()->json([
-                'message' => "Kuna Tatizo. Tumeshindwa kukupata kwenye database yetu. Piga simu msaada {$helpNumber}"
+                'message' => "Kuna tatizo. Hatukupata kwenye database. Piga msaada: {$helpNumber}"
             ], 401);
         }
 
-        $user = auth()->user();
+        $user = auth()->user()->load('activeOfisi.ofisi');
 
-        // Check if user has an activeOfisi record
+        // 2️⃣ Check if user has active office
         if (!$user->activeOfisi) {
-            return response()->json([
-                'message' => 'Huna Ofisi'
-            ], 401);
+            return response()->json(['message' => 'Huna Ofisi'], 401);
         }
 
-        // Find the UserOfisi record for user and the activeOfisi's ofisi_id
-        $userOfisi = UserOfisi::where('user_id', $user->id)
-            ->where('ofisi_id', $user->activeOfisi->ofisi_id)
-            ->first();
+        $ofisi = $user->activeOfisi->ofisi;
 
-        // Validate that userOfisi and its related ofisi exist
-        if (!$userOfisi || !$userOfisi->ofisi) {
+        // 3️⃣ Validate office record exists
+        if (!$ofisi) {
             return response()->json([
-                'message' => "Ofisi haijapatikana. Piga simu msaada {$helpNumber}"
+                'message' => "Ofisi haijapatikana. Piga msaada: {$helpNumber}"
             ], 404);
         }
 
-        // Return the Ofisi model
-        return $userOfisi->ofisi;
-    }
+        // 4️⃣ Update timestamps
+        $user->update(['last_login_at' => now()]);//not updating last login time
+        $ofisi->update(['last_seen' => now()]);
 
+        // 5️⃣ Return actual ofisi model
+        return $ofisi;
+    }
 }
