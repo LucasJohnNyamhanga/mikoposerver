@@ -862,23 +862,19 @@ class OfisiController extends Controller
 
     public function getOfisiZilizolipaLeo(OfisiRequest $request, OfisiService $ofisiService)
     {
-        $ofisi = $ofisiService->getAuthenticatedOfisiUser();
-        if ($ofisi instanceof JsonResponse) {
-            return $ofisi;
-        }
-
-        $ofisi = Ofisi::with(['payments' => function ($q) {
-            $q->whereDate('created_at', today())
+        $ofisi = Ofisi::whereHas('payments', function ($q) {
+            $q->whereDate('paid_at', today())
             ->where('status', 'completed');
-        }])
-        ->withTodayCompletedPayments()
+        })
+        ->with('latestPaymentToday') // will return single Payment model, not collection
         ->get();
-
 
         return response()->json([
             'ofisi' => $ofisi,
         ]);
+
     }
+
 
 
     private function updateLoanStatuses($ofisiId)

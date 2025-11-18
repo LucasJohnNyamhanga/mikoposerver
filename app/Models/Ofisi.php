@@ -107,6 +107,15 @@ class Ofisi extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function latestPaymentToday()
+    {
+        return $this->hasOne(Payment::class)
+            ->whereDate('paid_at', today())
+            ->where('status', 'completed')
+            ->latestOfMany('paid_at');
+    }
+
+
     public function verifiedAccount(): HasOne
     {
         return $this->hasOne(VerifiedAccount::class);
