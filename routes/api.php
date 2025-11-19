@@ -83,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // routes/api.php
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/getOfisiZilizolipaLeo', [OfisiController::class, 'getOfisiZilizolipaLeo']);
+    Route::get('/getOfisiDetailById', [OfisiController::class, 'getOfisiDetailById']);
 
 });
 

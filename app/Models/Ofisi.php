@@ -115,6 +115,19 @@ class Ofisi extends Model
             ->latestOfMany('paid_at');
     }
 
+    public function activeKifurushi()
+    {
+        return $this->hasOne(KifurushiPurchase::class, 'ofisi_id', 'id')
+            ->where('status', 'approved')
+            ->where('is_active', true)
+            ->whereDate('start_date', '<=', today())
+            ->whereDate('end_date', '>=', today())
+            ->latestOfMany('end_date');
+    }
+
+
+
+
 
     public function verifiedAccount(): HasOne
     {

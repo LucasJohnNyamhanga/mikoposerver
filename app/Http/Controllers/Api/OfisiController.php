@@ -875,6 +875,55 @@ class OfisiController extends Controller
 
     }
 
+    public function getOfisiDetailById(OfisiRequest $request, OfisiService $ofisiService)
+    {
+        // Validate incoming request
+        $validated = Validator::make($request->all(), [
+            'ofisiId' => 'required|integer|exists:ofisis,id',
+        ]);
+
+        $ofisiId = $request->ofisiId;
+
+
+        if ($validated->fails()) {
+            return response()->json([
+                'message' => 'Utambuzi wa ofisi uliowasilishwa umeshindikana.',
+                'errors' => $validated->errors(),
+            ], 400);
+        }
+
+        $ofisi = Ofisi::with([
+            'activeKifurushi.kifurushi',
+
+            'users' => function ($q) {
+                $q->wherePivot('status', 'accepted');
+            },
+
+            'payments' => function ($q) {
+                $q->where('status', 'completed')
+                ->latest(); // ← ensures newest payments first
+            },
+
+            'payments.user',  // include the user who made each payment
+        ])
+        ->withCount('customers')   // adds customers_count
+        ->where('id', $ofisiId)
+        ->first();
+
+
+
+        if (!$ofisi) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ofisi not found'
+            ], 404);
+        }
+
+        return response()->json([
+            'ofisi' => $ofisi,
+        ]);
+
+    }
 
 
     private function updateLoanStatuses($ofisiId)
