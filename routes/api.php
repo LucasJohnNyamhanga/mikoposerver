@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\BeemWebhookController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DhamanaController;
+use App\Http\Controllers\Api\KifurushiController;
 use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\MiamalaController;
@@ -84,6 +85,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/getOfisiZilizolipaLeo', [OfisiController::class, 'getOfisiZilizolipaLeo']);
     Route::get('/getOfisiDetailById', [OfisiController::class, 'getOfisiDetailById']);
+    Route::get('/vifurushi', [KifurushiController::class, 'index']);
+
 
 });
 
