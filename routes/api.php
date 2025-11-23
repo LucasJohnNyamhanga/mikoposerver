@@ -85,8 +85,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/getOfisiZilizolipaLeo', [OfisiController::class, 'getOfisiZilizolipaLeo']);
     Route::get('/getOfisiDetailById', [OfisiController::class, 'getOfisiDetailById']);
-    Route::get('/vifurushi', [KifurushiController::class, 'index']);
-
+    Route::get('/vifurushi', [KifurushiController::class, 'getVifurushi']);
+    Route::get('/sajiliKifurushi', [KifurushiController::class, 'sajili']);
 
 });
 

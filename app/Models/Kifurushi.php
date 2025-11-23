@@ -53,17 +53,18 @@ class Kifurushi extends Model
     protected $fillable = [
         'name',
         'description',
-        'muda',
         'number_of_offices',
         'duration_in_days',
         'price',
         'sms',
-        'is_active',
-        'is_popular',
         'offer',
+        'is_popular',
         'special',
         'type',
+        'muda',
+        'is_active',
     ];
+
 
     protected $casts = [
         'is_active'   => 'boolean',
