@@ -13,7 +13,7 @@ class KifurushiController extends Controller
     {
         try {
             // Pata vifurushi vyote
-            $vifurushi = Kifurushi::all();
+            $vifurushi = Kifurushi::latest()->get();
 
             // Return JSON response
             return response()->json([
@@ -78,4 +78,51 @@ class KifurushiController extends Controller
             ], 500);
         }
     }
+
+    public function zimaWashaKifurushi(Request $request)
+    {
+        // Validate input
+        $validator = Validator::make($request->all(), [
+            'kifurushiId' => 'required|integer|exists:kifurushis,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first()
+            ], 400);
+        }
+
+        try {
+            $id = $request->kifurushiId;
+
+            // Fetch kifurushi
+            $kifurushi = Kifurushi::find($id);
+
+            if (!$kifurushi) {
+                return response()->json([
+                    'message' => 'Kifurushi hakijapatikana'
+                ], 404);
+            }
+
+            // Toggle is_active
+            $kifurushi->is_active = !$kifurushi->is_active;
+            $kifurushi->save();
+
+            // Custom message
+            $msg = $kifurushi->is_active
+                ? 'Kifurushi kimewashwa kikamilifu'
+                : 'Kifurushi kimezimwa kikamilifu';
+
+            return response()->json([
+                'message' => $msg,
+                'is_active' => $kifurushi->is_active
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Hitilafu ya seva: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
 }

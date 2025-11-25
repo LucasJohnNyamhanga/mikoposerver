@@ -87,6 +87,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/getOfisiDetailById', [OfisiController::class, 'getOfisiDetailById']);
     Route::get('/vifurushi', [KifurushiController::class, 'getVifurushi']);
     Route::get('/sajiliKifurushi', [KifurushiController::class, 'sajili']);
+    Route::get('/zimaWashaKifurushi', [KifurushiController::class, 'zimaWashaKifurushi']);
 
 });
 
